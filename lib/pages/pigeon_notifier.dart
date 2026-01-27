@@ -6,7 +6,7 @@ import 'package:vibration/vibration.dart';
 
 class PigeonNotificationService {
   Socket? _socket;
-  final String serverIp = "https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev/login_pigeon"; 
+  final String serverIp = "127.0.0.1"; 
   final int port = 8080;
   
   final _controller = StreamController<void>.broadcast();
@@ -47,7 +47,7 @@ class PigeonNotificationService {
 
   void _playPigeonSound() async {
     // Certifique-se de ter o arquivo em assets/sounds/pigeon_alert.mp3
-    await _audioPlayer.play(AssetSource('sounds/pigeon_alert.mp3'));
+    await _audioPlayer.play(AssetSource('sounds/push.mp3'));
   }
 
   void _triggerVibration() async {
