@@ -3,7 +3,7 @@ modules = ["dart-3.3"]
 
 [nix]
 channel="stable-24_05"
-packages = ["flutter"]
+packages = ["flutter", "temurin-jre-bin-17"]
 
 [deployment]
 run = ["dart", "main.dart"]
