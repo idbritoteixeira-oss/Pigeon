@@ -37,7 +37,7 @@ jobs:
       
       - name: Build APK
         # Adicionei o '--no-pub' para garantir que ele use o que foi baixado no step anterior [cite: 2026-01-26]
-        run: flutter build apk --release --target-platform android-arm64
+        run: flutter build apk --release --no-pub
         env:
           # Injeção direta para o Gradle encontrar o motor do Flutter [cite: 2026-01-26]
           FLUTTER_ROOT: ${{ env.FLUTTER_ROOT }}

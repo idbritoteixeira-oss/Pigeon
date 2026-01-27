@@ -6,7 +6,7 @@ environment:
   sdk: '>=3.4.0 <4.0.0'
 
 dependencies:
-  # Versões exatas extraídas do seu log de 2026-01-26
+  # Versões
   http: ^1.6.0
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.3.3
