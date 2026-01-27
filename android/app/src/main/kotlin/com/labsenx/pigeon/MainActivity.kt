@@ -1,0 +1,5 @@
+package com.labsenx.pigeon
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity: FlutterActivity()

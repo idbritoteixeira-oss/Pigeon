@@ -1,0 +1,50 @@
+name: apk pigeon 
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0' 
+          channel: 'stable'
+          cache: true
+          
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Create local.properties
+        run: |
+          # Garante paridade usando a variável que o log confirmou: FLUTTER_ROOT [cite: 2026-01-26]
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
+
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+      
+      - name: Build APK
+        # Adicionei o '--no-pub' para garantir que ele use o que foi baixado no step anterior [cite: 2026-01-26]
+        run: flutter build apk --release --target-platform android-arm64
+        env:
+          # Injeção direta para o Gradle encontrar o motor do Flutter [cite: 2026-01-26]
+          FLUTTER_ROOT: ${{ env.FLUTTER_ROOT }}
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-pigeon-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          
