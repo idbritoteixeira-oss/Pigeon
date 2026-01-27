@@ -16,7 +16,7 @@ class AlertListener {
     try {
       // Importante: Verifique se o IP é o do servidor Replit ou 10.0.2.2 (emulador)
       // Usar 127.0.0.1 só funciona se o servidor estiver no mesmo aparelho.
-      _socket = await Socket.connect('0.0.0.0', 8080, timeout: const Duration(seconds: 5));
+      _socket = await Socket.connect('https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev/',8080, timeout: const Duration(seconds: 5));
 
       print("📡 [EnX] Conectado ao canal de Alerta. Mantendo paridade...");
 

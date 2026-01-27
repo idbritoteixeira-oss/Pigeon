@@ -13,7 +13,7 @@ class _LoginState extends State<Login> {
   bool _isLoading = false;
 
   // REAVALIAÇÃO COGNITIVA: Host local injetado para paridade com o C++ [cite: 2025-10-27]
-  final String serverUrl = "http://127.0.0.1:8080";
+  final String serverUrl = "https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev/";
 
   Future<void> _verificarStatus() async {
     if (_idController.text.isEmpty) return;
