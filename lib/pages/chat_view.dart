@@ -43,7 +43,7 @@ class _ChatViewState extends State<ChatView> {
       if (_myId != null && _myId != "Desconhecido") {
         _notifier.connect(_myId!);
         
-        // REAVALIAÇÃO COGNITIVA: Escuta ativa do sinal 0x01 vindo do C++
+        // REAVALIAÇÃO COGNITIVA: Escuta ativa do sinal 0x01 vindo do C+
         _notificationSubscription = _notifier.onNewMessage.listen((_) async {
           // 1. Feedback tátil
           if (await Vibration.hasVibrator() ?? false) {
