@@ -8,15 +8,16 @@ import 'pages/login_2.dart';
 import 'pages/register_key.dart';
 import 'pages/home_pigeon.dart'; 
 import 'pages/chat_view.dart';
-import 'database/database_helper.dart'; // Importante pra inicializar o banco
+// REAVALIAÇÃO COGNITIVA: Trocado para o banco unificado PigeonDatabase
+import 'database/pigeon_database.dart'; 
 
 void main() async {
   // Inicialização vital para SharedPreferences e Sqflite
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inicializa o banco de dados local logo na abertura do app
-  // Isso traz um sentimento de Confiança e evita travamentos ao abrir o chat
-  await DatabaseHelper.instance.database;
+  // PARIDADE: Inicializa o banco de dados unificado PigeonDatabase
+  // Isso traz um sentimento de Confiança e evita que as queries falhem no primeiro boot
+  await PigeonDatabase.instance.database;
 
   final prefs = await SharedPreferences.getInstance();
   final bool isAuthenticated = prefs.getBool('is_authenticated') ?? false;
