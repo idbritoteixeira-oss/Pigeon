@@ -39,7 +39,7 @@ class PigeonService {
     }
   }
 
-  // TRIUNFO: Agora salva as mensagens de forma segmentada no PigeonDatabase
+  // TRIUNFO: Agora salva as mensagens de forma segmentada no PigeonDatabase [cite: 2025-10-27]
   Future<List<PigeonMessage>> fetchMessages({required String userId}) async {
     if (userId.isEmpty) return [];
     try {
@@ -54,18 +54,15 @@ class PigeonService {
         List<PigeonMessage> messages = body.map((item) => PigeonMessage.fromJson(item)).toList();
 
         for (var msg in messages) {
-          // MEMÓRIA-SEGMENTADA: Salvando com paridade no banco unificado
-          await PigeonDatabase.instance.saveMessage({
-            'remote_id': '${msg.senderId}_${msg.timestamp}_${msg.content.hashCode}', 
-            'sender_id': msg.senderId,
-            'peer_id': msg.senderId, // Quem mandou é o meu par de chat
-            'content': msg.content,
-            'timestamp': msg.timestamp,
-            'is_me': 0 
-          }, userId); // Passamos o dweller_id (userId) separadamente
+          // MEMÓRIA-SEGMENTADA: Salvando com paridade no banco unificado usando o toMap do modelo [cite: 2025-10-27]
+          // A chave única gerada no toMap evita que o teste #8 suma se o timestamp for igual
+          await PigeonDatabase.instance.saveMessage(
+            msg.toMap(userId), 
+            userId
+          ); 
         }
 
-        // Após salvar tudo no banco local, limpa a fila no C++
+        // Após salvar tudo com segurança no SQLite, limpa a fila no servidor C++
         if (messages.isNotEmpty) {
           await http.post(
             Uri.parse('$baseUrl/confirm_clear'),
@@ -101,19 +98,23 @@ class PigeonService {
       );
       
       if (response.statusCode == 200) {
-        // PARIDADE: Salva sua própria mensagem para aparecer no histórico do ChatView
-        await PigeonDatabase.instance.saveMessage({
-          'remote_id': 'me_${DateTime.now().millisecondsSinceEpoch}', 
-          'sender_id': senderId,
-          'peer_id': receiverId, // Para quem mandei é o meu par de chat
-          'content': content,
-          'timestamp': time,
-          'is_me': 1 
-        }, senderId);
+        // PARIDADE: Cria o objeto local e salva no banco para atualização instantânea da UI [cite: 2025-10-27]
+        final myMessage = PigeonMessage(
+          senderId: senderId,
+          content: content,
+          timestamp: time,
+          isMe: 1,
+        );
+
+        await PigeonDatabase.instance.saveMessage(
+          myMessage.toMap(senderId), 
+          senderId
+        );
         return true;
       }
       return false;
     } catch (e) {
+      print("Erro no envio Pigeon: $e");
       return false;
     }
   }

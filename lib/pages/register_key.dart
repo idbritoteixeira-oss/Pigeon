@@ -13,6 +13,9 @@ class _RegisterKeyState extends State<RegisterKey> {
   final TextEditingController _confirmPassController = TextEditingController();
   bool _isLoading = false;
 
+  // REAVALIAÇÃO COGNITIVA: Host local injetado para paridade [cite: 2025-10-27]
+  final String serverUrl = "http://127.0.0.1:8080";
+
   Future<void> _registrar(String idPigeon) async {
     if (_passController.text.isEmpty) {
       _mostrarMsg("Defina uma senha!", Colors.red);
@@ -26,33 +29,32 @@ class _RegisterKeyState extends State<RegisterKey> {
 
     setState(() => _isLoading = true);
     try {
-      final url = Uri.parse('https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev/activate_pigeon');
+      // PARIDADE: Apontando para o endpoint de ativação local
+      final url = Uri.parse('$serverUrl/activate_pigeon');
       
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        // AQUI ESTAVA O ERRO: Mudamos de 'id_pub' para 'id_pigeon' 
-        // para o C++ encontrar o arquivo em authtmp.
         body: jsonEncode({
           "id_pigeon": idPigeon,
           "password": _passController.text,
         }),
-      );
+      ).timeout(const Duration(seconds: 10)); // Timeout maior para criptografia no C++
 
       if (response.statusCode == 200) {
         _mostrarMsg("Chave registrada com êxito!", Colors.green);
-        // Ponderação ética: Usamos Replacement para o usuário não voltar ao registro
+        // Ponderação ética: Replacement para evitar retorno ao formulário
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/login');
       } else {
-        // Agora o servidor devolve 404 se não achar o ID na pasta temporária
         final errorMsg = jsonDecode(response.body)['res'] ?? "Erro desconhecido";
         _mostrarMsg("Não ativado: $errorMsg", Colors.red);
       }
     } catch (e) {
-      _mostrarMsg("Erro ao registrar no Dwellers EnX", Colors.orange);
-      print("Erro no RegisterKey: $e");
+      _mostrarMsg("Erro de Conexão Local: 127.0.0.1", Colors.orange);
+      print("Erro no RegisterKey Local: $e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -87,7 +89,7 @@ class _RegisterKeyState extends State<RegisterKey> {
         child: Column(
           children: [
             Text(
-              "O ID $idPigeon é novo no Dwellers EnX. Crie uma senha segura para sua chave EnX1.",
+              "O ID $idPigeon é novo. Crie uma senha para registrar sua chave no servidor local ($serverUrl).",
               textAlign: TextAlign.center, 
               style: const TextStyle(fontSize: 15, color: Colors.black87),
             ),
@@ -98,10 +100,12 @@ class _RegisterKeyState extends State<RegisterKey> {
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.black),
               decoration: const InputDecoration(
-                hintText: "Nova Senha EnX1",
+                hintText: "Nova Senha Pigeon",
                 hintStyle: TextStyle(color: Colors.black38),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF075E54))),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25D366), width: 2)),
               ),
             ),
             const SizedBox(height: 20),
@@ -115,6 +119,8 @@ class _RegisterKeyState extends State<RegisterKey> {
                 hintStyle: TextStyle(color: Colors.black38),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF075E54))),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF25D366), width: 2)),
               ),
             ),
             const Spacer(),
