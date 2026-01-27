@@ -1,38 +1,28 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/pigeon_model.dart';
-import '../database/database_helper.dart';
+// REAVALIAÇÃO COGNITIVA: Agora aponta para o banco unificado [cite: 2025-10-27]
+import '../database/pigeon_database.dart'; 
 
 class PigeonService {
   final String baseUrl = "https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev"; 
 
-  // --- ATIVAÇÃO CORRIGIDA PARA PARIDADE ---
   Future<bool> activatePigeon({required String idPigeon, required String password}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/activate_pigeon'),
         headers: {"Content-Type": "application/json"},
-        // PARIDADE: Enviando 'id_pigeon' para bater com o C++
         body: jsonEncode({
           "id_pigeon": idPigeon, 
           "password": password
         }),
       );
-
-      if (response.statusCode == 200) {
-        print("✅ Ativação concluída!");
-        return true;
-      } else {
-        print("⚠️ Erro na ativação: ${response.statusCode}");
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print("❌ Erro de rede: $e");
       return false;
     }
   }
 
-  // --- LOGIN CORRIGIDO ---
   Future<bool> loginPigeon({required String idPigeon, required String password}) async {
     try {
       final response = await http.post(
@@ -49,6 +39,7 @@ class PigeonService {
     }
   }
 
+  // TRIUNFO: Agora salva as mensagens de forma segmentada no PigeonDatabase
   Future<List<PigeonMessage>> fetchMessages({required String userId}) async {
     if (userId.isEmpty) return [];
     try {
@@ -63,17 +54,18 @@ class PigeonService {
         List<PigeonMessage> messages = body.map((item) => PigeonMessage.fromJson(item)).toList();
 
         for (var msg in messages) {
-          await DatabaseHelper.instance.insertMessage({
-            'remote_id': '${msg.senderId}_${msg.timestamp}', 
-            'id_pigeon': userId,   
-            'peer_id': msg.senderId, 
+          // MEMÓRIA-SEGMENTADA: Salvando com paridade no banco unificado
+          await PigeonDatabase.instance.saveMessage({
+            'remote_id': '${msg.senderId}_${msg.timestamp}_${msg.content.hashCode}', 
             'sender_id': msg.senderId,
+            'peer_id': msg.senderId, // Quem mandou é o meu par de chat
             'content': msg.content,
             'timestamp': msg.timestamp,
             'is_me': 0 
-          });
+          }, userId); // Passamos o dweller_id (userId) separadamente
         }
 
+        // Após salvar tudo no banco local, limpa a fila no C++
         if (messages.isNotEmpty) {
           await http.post(
             Uri.parse('$baseUrl/confirm_clear'),
@@ -85,6 +77,7 @@ class PigeonService {
       }
       return [];
     } catch (e) {
+      print("Erro ao buscar mensagens: $e");
       return [];
     }
   }
@@ -108,15 +101,15 @@ class PigeonService {
       );
       
       if (response.statusCode == 200) {
-        await DatabaseHelper.instance.insertMessage({
-          'remote_id': 'me_$time', 
-          'id_pigeon': senderId,   
-          'peer_id': receiverId,   
+        // PARIDADE: Salva sua própria mensagem para aparecer no histórico do ChatView
+        await PigeonDatabase.instance.saveMessage({
+          'remote_id': 'me_${DateTime.now().millisecondsSinceEpoch}', 
           'sender_id': senderId,
+          'peer_id': receiverId, // Para quem mandei é o meu par de chat
           'content': content,
           'timestamp': time,
           'is_me': 1 
-        });
+        }, senderId);
         return true;
       }
       return false;
