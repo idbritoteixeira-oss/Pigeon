@@ -4,8 +4,9 @@ import 'dart:async';
 import '../style.dart'; 
 import '../services/pigeon_service.dart'; 
 import '../models/pigeon_model.dart';
-import '../database/database_helper.dart';
-import '../services/alert_listener.dart'; // Importação do serviço de escuta ativa
+// REAVALIAÇÃO COGNITIVA: Trocado para o banco unificado [cite: 2025-10-27]
+import '../database/pigeon_database.dart'; 
+import '../services/alert_listener.dart'; 
 
 class HomePigeon extends StatefulWidget {
   @override
@@ -17,7 +18,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
   final PigeonService _pigeonService = PigeonService(); 
   final TextEditingController _newChatController = TextEditingController();
   
-  // Instância do AlertListener para manter a conexão com o C++
   final AlertListener _alertListener = AlertListener();
   StreamSubscription? _alertSubscription;
   
@@ -32,7 +32,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    // IMPORTANTE: Cancela a inscrição para evitar vazamento de memória e conflitos
     _alertSubscription?.cancel();
     _tabController.dispose();
     _newChatController.dispose();
@@ -43,21 +42,20 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     final prefs = await SharedPreferences.getInstance();
     final String dwellerId = prefs.getString('dweller_id') ?? "";
     
-    setState(() {
-      _currentDwellerId = dwellerId;
-    });
+    if (mounted) {
+      setState(() {
+        _currentDwellerId = dwellerId;
+      });
+    }
 
-    // REAVALIAÇÃO COGNITIVA: Se o ID existir, iniciamos a escuta do Notifier [cite: 2025-10-27]
     if (dwellerId.isNotEmpty) {
       _startActiveAlerts(dwellerId);
     }
   }
 
   void _startActiveAlerts(String userId) {
-    // Conecta ao socket de alertas (Porta 8080)
     _alertListener.startListening(userId);
     
-    // Escuta o Stream. Se receber 'true', significa que o C++ enviou o byte 0x01
     _alertSubscription = _alertListener.onMessageReceived.listen((hasNewData) {
       if (hasNewData && mounted) {
         print("🔔 [EnX] Sinal de paridade detectado. Atualizando interface...");
@@ -66,25 +64,25 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     });
   }
 
-  // TRIUNFO: Sincroniza com C++ e busca a lista de conversas ativas [cite: 2025-10-27]
+  // TRIUNFO: Busca os chats recentes do banco unificado PigeonDatabase
   Future<List<Map<String, dynamic>>> _getCombinedMessages(String userId) async {
     if (userId.isEmpty) return [];
     
     try {
-      // Sincroniza novas mensagens (Build #26)
+      // Tenta buscar novas mensagens no servidor C++
       await _pigeonService.fetchMessages(userId: userId);
     } catch (e) {
       print("Offline ou Erro de conexão: Mantendo dados locais.");
     }
 
-    // PARIDADE: Em vez de buscar mensagens de um ID vazio, buscamos os chats recentes
-    return await DatabaseHelper.instance.getRecentChats(userId); 
+    // PARIDADE: Chama a função que agrupa por peer_id para a Home
+    return await PigeonDatabase.instance.getRecentChats(userId); 
   }
 
   Future<void> _handleRefresh() async {
-    await _loadSessionId(); 
-    // O setState força o FutureBuilder a disparar novamente o _getCombinedMessages
-    setState(() {}); 
+    if (mounted) {
+      setState(() {}); 
+    }
     return await Future.delayed(const Duration(milliseconds: 500)); 
   }
 
@@ -134,9 +132,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final String argId = ModalRoute.of(context)!.settings.arguments as String? ?? "";
-    final String activeId = argId.isNotEmpty ? argId : _currentDwellerId;
-
     return Scaffold(
       backgroundColor: EnXStyle.backgroundBlack, 
       appBar: AppBar(
@@ -146,7 +141,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
         actions: [
           Center(child: Padding(
             padding: const EdgeInsets.only(right: 15),
-            child: Text(activeId, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            child: Text(_currentDwellerId, style: const TextStyle(color: Colors.white38, fontSize: 12)),
           ))
         ],
         elevation: 0,
@@ -168,7 +163,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
             onRefresh: _handleRefresh,
             color: const Color(0xFF25D366),
             backgroundColor: EnXStyle.primaryBlue,
-            child: _buildLiveChatList(activeId), 
+            child: _buildLiveChatList(_currentDwellerId), 
           ),
           _buildExploreView(), 
         ],
@@ -194,7 +189,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
             physics: const AlwaysScrollableScrollPhysics(),
             children: const [
               SizedBox(height: 100),
-              Center(child: Text("Nenhuma mensagem armazenada.", style: TextStyle(color: Colors.white38))),
+              Center(child: Text("Nenhuma conversa ativa.", style: TextStyle(color: Colors.white38))),
             ],
           );
         }
@@ -205,8 +200,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
           itemCount: messages.length,
           itemBuilder: (context, index) {
             final msg = messages[index];
-            // MEMÓRIA-SEGMENTADA: Define quem é o outro na conversa [cite: 2025-10-27]
-            final String contactId = msg['peer_id'] ?? msg['sender_id'] ?? "Desconhecido";
+            final String contactId = msg['peer_id'] ?? "Desconhecido";
 
             return ListTile(
               leading: const CircleAvatar(
@@ -222,12 +216,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white38, fontSize: 13)
               ),
-              trailing: Text(
-                msg['timestamp'].toString().contains('T') 
-                    ? msg['timestamp'].toString().split('T').first.substring(5) 
-                    : "Recente", 
-                style: const TextStyle(fontSize: 11, color: Colors.white24)
-              ),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white12, size: 16),
               onTap: () {
                 Navigator.pushNamed(context, '/chat', arguments: contactId);
               }, 

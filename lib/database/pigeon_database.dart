@@ -2,7 +2,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class PigeonDatabase {
-  // Singleton para garantir que só exista uma instância do banco aberta
   static final PigeonDatabase instance = PigeonDatabase._init();
   static Database? _database;
 
@@ -10,7 +9,7 @@ class PigeonDatabase {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('pigeon_enx.db'); // Nome do arquivo físico
+    _database = await _initDB('pigeon_enx.db');
     return _database!;
   }
 
@@ -25,35 +24,69 @@ class PigeonDatabase {
     );
   }
 
-  // Lógica de criação da tabela - Foco no id_pigeon
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        remote_id TEXT UNIQUE,   -- ID vindo do C++ para evitar duplicados
-        dweller_id TEXT,         -- Seu id_pigeon (0123456789)
-        sender_id TEXT,          -- Quem enviou
-        content TEXT,            -- O texto da mensagem
-        timestamp TEXT           -- Horário do recebimento
+        remote_id TEXT UNIQUE,   
+        dweller_id TEXT,         -- Seu ID (Dono da conta no dispositivo)
+        peer_id TEXT,            -- ID do contato (Com quem você conversa)
+        sender_id TEXT,          -- Quem de fato enviou
+        content TEXT,            
+        timestamp TEXT,
+        is_me INTEGER            -- 1 para enviadas, 0 para recebidas
       )
     ''');
   }
 
-  // Função para salvar a mensagem vinda do server
-  Future<int> saveMessage(Map<String, dynamic> row) async {
+  // TRIUNFO: Salva organizando a paridade de quem é o contato
+  Future<int> saveMessage(Map<String, dynamic> row, String currentDwellerId) async {
     final db = await instance.database;
-    // INSERT OR IGNORE evita erro se tentar salvar a mesma mensagem duas vezes
-    return await db.insert('messages', row, conflictAlgorithm: ConflictAlgorithm.ignore);
+    final Map<String, dynamic> mutableRow = Map.from(row);
+
+    // Garante que a mensagem pertença ao usuário logado
+    mutableRow['dweller_id'] = currentDwellerId;
+
+    // Lógica de Peer: Se eu enviei (is_me=1), o peer é quem recebe. 
+    // Se eu recebi, o peer é quem enviou.
+    if (mutableRow['peer_id'] == null || mutableRow['peer_id'] == "") {
+      mutableRow['peer_id'] = (mutableRow['is_me'] == 1) 
+          ? mutableRow['receiver_id'] 
+          : mutableRow['sender_id'];
+    }
+
+    return await db.insert(
+      'messages', 
+      mutableRow, 
+      conflictAlgorithm: ConflictAlgorithm.replace 
+    );
   }
 
-  // Função para ler as mensagens do banco e exibir na sua lista
-  Future<List<Map<String, dynamic>>> getMessages(String idPigeon) async {
+  // --- PARA O CHATVIEW: Histórico COMPLETO (Bombardeio) ---
+  Future<List<Map<String, dynamic>>> getChatHistory(String myId, String peerId) async {
     final db = await instance.database;
+    // Sem GROUP BY para trazer todas as mensagens da conversa
     return await db.query(
       'messages',
-      where: 'dweller_id = ?',
-      whereArgs: [idPigeon],
-      orderBy: 'id DESC' // Mais recentes primeiro
+      where: 'dweller_id = ? AND peer_id = ?',
+      whereArgs: [myId, peerId],
+      orderBy: 'id ASC' // Ordem cronológica
     );
+  }
+
+  // --- PARA A HOME: Resumo das conversas ---
+  Future<List<Map<String, dynamic>>> getRecentChats(String myId) async {
+    final db = await instance.database;
+    return await db.rawQuery('''
+      SELECT * FROM messages 
+      WHERE dweller_id = ? 
+      GROUP BY peer_id 
+      ORDER BY id DESC
+    ''', [myId]);
+  }
+
+  Future<void> deleteMessage(int id) async {
+    final db = await instance.database;
+    await db.delete('messages', where: 'id = ?', whereArgs: [id]);
   }
 }
