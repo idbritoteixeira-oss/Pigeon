@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vibration/vibration.dart'; // [cite: 2025-10-27]
+import 'package:vibration/vibration.dart';
+import 'package:audioplayers/audioplayers.dart'; 
+import 'dart:async';
 import '../style.dart';
 import '../services/pigeon_service.dart';
 import '../database/database_helper.dart';
@@ -14,9 +16,12 @@ class ChatView extends StatefulWidget {
 class _ChatViewState extends State<ChatView> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AudioPlayer _audioPlayer = AudioPlayer(); 
+  
   List<Map<String, dynamic>> _messages = []; 
   final PigeonService _pigeonService = PigeonService();
   final PigeonNotificationService _notifier = PigeonNotificationService();
+  StreamSubscription? _notificationSubscription;
   
   String? _myId;
   String _peerId = ""; 
@@ -38,18 +43,28 @@ class _ChatViewState extends State<ChatView> {
       if (_myId != null && _myId != "Desconhecido") {
         _notifier.connect(_myId!);
         
-        // Escuta o sinal 0x01 e dispara o refresh [cite: 2025-10-27]
-        _notifier.onNewMessage.listen((_) async {
+        // REAVALIAÇÃO COGNITIVA: Escuta ativa do sinal 0x01 vindo do C++
+        _notificationSubscription = _notifier.onNewMessage.listen((_) async {
+          // 1. Feedback tátil
           if (await Vibration.hasVibrator() ?? false) {
             Vibration.vibrate(duration: 50); 
           }
+
+          // 2. Feedback Sonoro: Recebimento (Paridade com Notifier)
+          try {
+            await _audioPlayer.play(AssetSource('sounds/push.mp3'));
+          } catch (e) {
+            print("Erro som push: $e");
+          }
+          
+          // 3. Sincronização e atualização da UI
           await _syncWithServer(); 
           _scrollToBottom();
         });
       }
       
       await _loadLocalHistory();
-      await _syncWithServer(); // Busca mensagens limpas ao entrar
+      await _syncWithServer(); 
       _scrollToBottom();
     } catch (e) {
       print("Erro ao inicializar chat: $e");
@@ -70,11 +85,9 @@ class _ChatViewState extends State<ChatView> {
     });
   }
 
-  // CORREÇÃO DEFINITIVA: Parâmetro nomeado 'userId' conforme PigeonService
   Future<void> _syncWithServer() async {
     if (_myId == null || _myId == "Desconhecido") return;
     try {
-      // Sincroniza usando a assinatura correta do serviço
       await _pigeonService.fetchMessages(userId: _myId!); 
       await _loadLocalHistory();
     } catch (e) {
@@ -93,6 +106,7 @@ class _ChatViewState extends State<ChatView> {
     }
   }
 
+  // TRIUNFO: Som de envio e atualização otimista
   void _sendMessage() async {
     if (_messageController.text.trim().isEmpty || _myId == null || _peerId.isEmpty) {
       return;
@@ -101,6 +115,14 @@ class _ChatViewState extends State<ChatView> {
     final String text = _messageController.text;
     final String time = DateTime.now().toIso8601String();
 
+    // 1. Feedback Sonoro: Envio (send.mp3)
+    try {
+      await _audioPlayer.play(AssetSource('sounds/send.mp3'));
+    } catch (e) {
+      print("Erro ao tocar send.mp3: $e");
+    }
+
+    // 2. Atualização Otimista da Interface
     setState(() {
       _messages.add({
         'content': text,
@@ -112,6 +134,7 @@ class _ChatViewState extends State<ChatView> {
     _messageController.clear();
     _scrollToBottom();
 
+    // 3. Envio Real para o Servidor
     try {
       await _pigeonService.sendMessage(
         senderId: _myId!, 
@@ -125,7 +148,10 @@ class _ChatViewState extends State<ChatView> {
 
   @override
   void dispose() {
+    _notificationSubscription?.cancel();
     _scrollController.dispose();
+    _audioPlayer.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
@@ -253,4 +279,5 @@ class _ChatViewState extends State<ChatView> {
       ),
     );
   }
+}
 }

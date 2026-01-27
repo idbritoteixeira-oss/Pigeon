@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart'; // [cite: 2025-10-27]
 import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
@@ -8,6 +9,8 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _readyToContinue = false;
+  // Instância do player para o som característico
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -17,6 +20,29 @@ class _SplashScreenState extends State<SplashScreen> {
         setState(() => _readyToContinue = true);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose(); // Limpeza de memória
+    super.dispose();
+  }
+
+  // TRIUNFO: Função que toca o som prru.mp3 e navega
+  Future<void> _handleAgreement() async {
+    try {
+      // Toca o som do pombo antes da transição
+      await _audioPlayer.play(AssetSource('sounds/prru.mp3'));
+    } catch (e) {
+      print("Erro ao tocar prru.mp3: $e");
+    }
+
+    // Pequeno delay para o som ser ouvido antes da troca de tela
+    await Future.delayed(Duration(milliseconds: 300));
+    
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
   }
 
   @override
@@ -43,7 +69,10 @@ class _SplashScreenState extends State<SplashScreen> {
                 else ...[
                   Text(
                     "Bem-vindo(a) ao Pigeon",
-                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 15),
                   Text(
@@ -52,9 +81,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     style: TextStyle(color: Colors.grey[400], fontSize: 13),
                   ),
                   SizedBox(height: 25),
-                  // Botão com Gradiente inspirado no Logo
+                  // Botão com Gradiente e Som Prru
                   GestureDetector(
-                    onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+                    onTap: _handleAgreement, // Injeção da lógica sonora
                     child: Container(
                       width: double.infinity,
                       height: 50,
@@ -62,9 +91,9 @@ class _SplashScreenState extends State<SplashScreen> {
                         borderRadius: BorderRadius.circular(30),
                         gradient: LinearGradient(
                           colors: [
-                            Color(0xFF8E2DE2), // Roxo (Início do gradiente)
+                            Color(0xFF8E2DE2), // Roxo
                             Color(0xFF4A00E0), // Azul Profundo
-                            Color(0xFF25D366), // Verde Pigeon (Fim do gradiente)
+                            Color(0xFF25D366), // Verde Pigeon
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -74,10 +103,9 @@ class _SplashScreenState extends State<SplashScreen> {
                         child: Text(
                           "CONCORDAR E CONTINUAR",
                           style: TextStyle(
-                            color: Colors.white, 
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2
-                          ),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2),
                         ),
                       ),
                     ),

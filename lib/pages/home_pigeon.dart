@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import '../style.dart'; 
 import '../services/pigeon_service.dart'; 
 import '../models/pigeon_model.dart';
 import '../database/database_helper.dart';
+import '../services/alert_listener.dart'; // Importação do serviço de escuta ativa
 
 class HomePigeon extends StatefulWidget {
   @override
@@ -14,6 +16,11 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
   late TabController _tabController;
   final PigeonService _pigeonService = PigeonService(); 
   final TextEditingController _newChatController = TextEditingController();
+  
+  // Instância do AlertListener para manter a conexão com o C++
+  final AlertListener _alertListener = AlertListener();
+  StreamSubscription? _alertSubscription;
+  
   String _currentDwellerId = "";
 
   @override
@@ -23,10 +30,39 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     _loadSessionId(); 
   }
 
+  @override
+  void dispose() {
+    // IMPORTANTE: Cancela a inscrição para evitar vazamento de memória e conflitos
+    _alertSubscription?.cancel();
+    _tabController.dispose();
+    _newChatController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSessionId() async {
     final prefs = await SharedPreferences.getInstance();
+    final String dwellerId = prefs.getString('dweller_id') ?? "";
+    
     setState(() {
-      _currentDwellerId = prefs.getString('dweller_id') ?? "";
+      _currentDwellerId = dwellerId;
+    });
+
+    // REAVALIAÇÃO COGNITIVA: Se o ID existir, iniciamos a escuta do Notifier [cite: 2025-10-27]
+    if (dwellerId.isNotEmpty) {
+      _startActiveAlerts(dwellerId);
+    }
+  }
+
+  void _startActiveAlerts(String userId) {
+    // Conecta ao socket de alertas (Porta 8080)
+    _alertListener.startListening(userId);
+    
+    // Escuta o Stream. Se receber 'true', significa que o C++ enviou o byte 0x01
+    _alertSubscription = _alertListener.onMessageReceived.listen((hasNewData) {
+      if (hasNewData && mounted) {
+        print("🔔 [EnX] Sinal de paridade detectado. Atualizando interface...");
+        _handleRefresh(); 
+      }
     });
   }
 
@@ -47,6 +83,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
 
   Future<void> _handleRefresh() async {
     await _loadSessionId(); 
+    // O setState força o FutureBuilder a disparar novamente o _getCombinedMessages
     setState(() {}); 
     return await Future.delayed(const Duration(milliseconds: 500)); 
   }

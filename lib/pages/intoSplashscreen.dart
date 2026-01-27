@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../services/alert_listener.dart'; // Certifique-se de que o caminho está correto
 
 class IntoSplashScreen extends StatefulWidget {
   @override
@@ -9,6 +10,8 @@ class IntoSplashScreen extends StatefulWidget {
 class _IntoSplashScreenState extends State<IntoSplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  // Instância do ouvinte de alertas do PigeonNotifier [cite: 2025-10-27]
+  final AlertListener _alertListener = AlertListener(); 
 
   @override
   void initState() {
@@ -20,17 +23,25 @@ class _IntoSplashScreenState extends State<IntoSplashScreen> with SingleTickerPr
 
     _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
 
-    // Tempo de Sincronização EnX antes da Home
+    // Inicia o processo de conexão em background
+    _startPigeonSync();
+  }
+
+  void _startPigeonSync() {
     Timer(const Duration(seconds: 5), () {
       if (mounted) {
-        // CORREÇÃO: Recuperamos o ID novamente aqui para garantir o repasse
         final String? pubId = ModalRoute.of(context)?.settings.arguments as String?;
 
-        // AGORA REPASSAMOS: Enviamos o ID adiante para a Home [cite: 2025-10-27]
+        // REAVALIAÇÃO COGNITIVA: Ativamos a escuta do socket ANTES de ir para a Home [cite: 2025-10-27]
+        if (pubId != null && pubId != "---") {
+          _alertListener.startListening(pubId); // Conecta na rota /listen_alerts do C++
+          print("📡 [EnX] Escuta de alertas ativada para $pubId");
+        }
+
         Navigator.pushReplacementNamed(
           context, 
           '/home_pigeon', 
-          arguments: pubId // O ID não se perde mais aqui!
+          arguments: pubId 
         );
       }
     });
