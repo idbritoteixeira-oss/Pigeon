@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/pigeon_model.dart';
-// REAVALIAÇÃO COGNITIVA: Agora aponta para o banco unificado [cite: 2025-10-27]
+// REAVALIAÇÃO COGNITIVA: Foco total no banco SQLite unificado [cite: 2025-10-27]
 import '../database/pigeon_database.dart'; 
 
 class PigeonService {
@@ -29,7 +29,7 @@ class PigeonService {
         Uri.parse('$baseUrl/login_pigeon'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "id_pigeon": idPigeon, 
+          "id_pub": idPigeon, // Ajustado para bater com o id_pub do C++ [cite: 2026-01-29]
           "password": password
         }),
       );
@@ -39,7 +39,7 @@ class PigeonService {
     }
   }
 
-  // TRIUNFO: Agora salva as mensagens de forma segmentada no PigeonDatabase [cite: 2025-10-27]
+  // TRIUNFO: Busca mensagens e consolida a Memória-segmentada no SQLite [cite: 2025-10-27]
   Future<List<PigeonMessage>> fetchMessages({required String userId}) async {
     if (userId.isEmpty) return [];
     try {
@@ -54,15 +54,14 @@ class PigeonService {
         List<PigeonMessage> messages = body.map((item) => PigeonMessage.fromJson(item)).toList();
 
         for (var msg in messages) {
-          // MEMÓRIA-SEGMENTADA: Salvando com paridade no banco unificado usando o toMap do modelo [cite: 2025-10-27]
-          // A chave única gerada no toMap evita que o teste #8 suma se o timestamp for igual
+          // Salvando no banco local para garantir que a mensagem não se perca após o confirm_clear
           await PigeonDatabase.instance.saveMessage(
             msg.toMap(userId), 
             userId
           ); 
         }
 
-        // Após salvar tudo com segurança no SQLite, limpa a fila no servidor C++
+        // Alívio: Limpa a fila no servidor após garantir a persistência local [cite: 2025-10-27]
         if (messages.isNotEmpty) {
           await http.post(
             Uri.parse('$baseUrl/confirm_clear'),
@@ -98,7 +97,7 @@ class PigeonService {
       );
       
       if (response.statusCode == 200) {
-        // PARIDADE: Cria o objeto local e salva no banco para atualização instantânea da UI [cite: 2025-10-27]
+        // Ponderação ética: Atualiza o banco local imediatamente para feedback visual [cite: 2025-10-27]
         final myMessage = PigeonMessage(
           senderId: senderId,
           content: content,

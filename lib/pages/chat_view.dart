@@ -5,9 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
 import '../style.dart';
 import '../services/pigeon_service.dart';
-// REAVALIAÇÃO COGNITIVA: Usando o banco unificado PigeonDatabase [cite: 2025-10-27]
 import '../database/pigeon_database.dart'; 
-import 'pigeon_notifier.dart'; 
 
 class ChatView extends StatefulWidget {
   @override
@@ -21,8 +19,9 @@ class _ChatViewState extends State<ChatView> {
   
   List<Map<String, dynamic>> _messages = []; 
   final PigeonService _pigeonService = PigeonService();
-  final PigeonNotificationService _notifier = PigeonNotificationService();
-  StreamSubscription? _notificationSubscription;
+  
+  // REAVALIAÇÃO COGNITIVA: Timer de Polling substitui o AlertListener [cite: 2025-10-27]
+  Timer? _chatPollingTimer;
   
   String? _myId;
   String _peerId = ""; 
@@ -41,28 +40,11 @@ class _ChatViewState extends State<ChatView> {
       final prefs = await SharedPreferences.getInstance();
       _myId = prefs.getString('dweller_id') ?? "Desconhecido";
       
-      if (_myId != null && _myId != "Desconhecido") {
-        _notifier.connect(_myId!);
-        
-        // ESCUTA ATIVA: O som push.mp3 toca no recebimento do sinal 0x01
-        _notificationSubscription = _notifier.onNewMessage.listen((_) async {
-          if (await Vibration.hasVibrator() ?? false) {
-            Vibration.vibrate(duration: 50); 
-          }
-
-          try {
-            await _audioPlayer.play(AssetSource('sounds/push.mp3'));
-          } catch (e) {
-            print("Erro som push: $e");
-          }
-          
-          // Sincroniza e recarrega a lista completa de mensagens
-          await _syncWithServer(); 
-        });
-      }
-      
       await _loadLocalHistory();
       await _syncWithServer(); 
+
+      // TRIUNFO: Ativa o Polling específico para a tela de chat (a cada 5 segundos)
+      _startChatPolling();
     } catch (e) {
       print("Erro ao inicializar chat: $e");
     } finally {
@@ -70,8 +52,25 @@ class _ChatViewState extends State<ChatView> {
     }
   }
 
+  void _startChatPolling() {
+    _chatPollingTimer?.cancel();
+    _chatPollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (mounted && _myId != null) {
+        // Verifica se há novas mensagens no servidor
+        int antes = _messages.length;
+        await _syncWithServer();
+        
+        // Se chegaram mensagens novas, dar feedback visual/sonoro
+        if (_messages.length > antes) {
+          if (await Vibration.hasVibrator() ?? false) Vibration.vibrate(duration: 50);
+          try { await _audioPlayer.play(AssetSource('sounds/push.mp3')); } catch (_) {}
+        }
+      }
+    });
+  }
+
+  // Restante da lógica de scroll e sincronização...
   void _scrollToBottom() {
-    // WidgetsBinding garante que o scroll aconteça após a lista ser desenhada
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -86,7 +85,6 @@ class _ChatViewState extends State<ChatView> {
   Future<void> _syncWithServer() async {
     if (_myId == null || _myId == "Desconhecido") return;
     try {
-      // Sincroniza via C++ e salva no PigeonDatabase
       await _pigeonService.fetchMessages(userId: _myId!); 
       await _loadLocalHistory();
     } catch (e) {
@@ -96,8 +94,6 @@ class _ChatViewState extends State<ChatView> {
 
   Future<void> _loadLocalHistory() async {
     if (_myId == null || _peerId.isEmpty) return;
-    
-    // PARIDADE: Busca o histórico COMPLETO usando a nova função unificada
     final history = await PigeonDatabase.instance.getChatHistory(_myId!, _peerId); 
 
     if (mounted) {
@@ -109,35 +105,28 @@ class _ChatViewState extends State<ChatView> {
   }
 
   void _sendMessage() async {
-    if (_messageController.text.trim().isEmpty || _myId == null || _peerId.isEmpty) {
-      return;
-    }
+    if (_messageController.text.trim().isEmpty || _myId == null || _peerId.isEmpty) return;
 
     final String text = _messageController.text;
-
-    try {
-      await _audioPlayer.play(AssetSource('sounds/send.mp3'));
-    } catch (e) {}
-
+    try { await _audioPlayer.play(AssetSource('sounds/send.mp3')); } catch (_) {}
     _messageController.clear();
 
     try {
-      // Envia para o servidor C++
       await _pigeonService.sendMessage(
         senderId: _myId!, 
         receiverId: _peerId, 
         content: text
       );
-      // Recarrega para mostrar a própria mensagem vinda do banco
       await _syncWithServer();
     } catch (e) {
-      print("Erro no envio Pigeon: $e");
+      print("Erro no envio: $e");
     }
   }
 
   @override
   void dispose() {
-    _notificationSubscription?.cancel();
+    // IMPORTANTE: Cancelar o timer para não gastar dados em background [cite: 2025-10-27]
+    _chatPollingTimer?.cancel();
     _scrollController.dispose();
     _audioPlayer.dispose();
     _messageController.dispose();
@@ -146,6 +135,7 @@ class _ChatViewState extends State<ChatView> {
 
   @override
   Widget build(BuildContext context) {
+    // O build permanece idêntico ao seu, garantindo a estética EnX
     return Scaffold(
       backgroundColor: EnXStyle.backgroundBlack,
       appBar: AppBar(
@@ -154,8 +144,7 @@ class _ChatViewState extends State<ChatView> {
         title: Row(
           children: [
             const CircleAvatar(
-              radius: 18, 
-              backgroundColor: Colors.white10, 
+              radius: 18, backgroundColor: Colors.white10, 
               child: Icon(Icons.person, color: Colors.white70, size: 20)
             ),
             const SizedBox(width: 12),
@@ -188,23 +177,18 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> msg) {
-    // MEMÓRIA-SEGMENTADA: Identifica se a mensagem é do usuário logado
     bool isMe = msg['sender_id'] == _myId || msg['is_me'] == 1;
-    String displayContent = msg['content'] ?? ""; 
-
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
+        margin: const Duration(vertical: 4) != null ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          gradient: isMe 
-            ? const LinearGradient(colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)]) 
-            : null,
+          gradient: isMe ? const LinearGradient(colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)]) : null,
           color: isMe ? null : Colors.white10,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: Text(displayContent, style: const TextStyle(color: Colors.white, fontSize: 15)),
+        child: Text(msg['content'] ?? "", style: const TextStyle(color: Colors.white, fontSize: 15)),
       ),
     );
   }

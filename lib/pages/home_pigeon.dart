@@ -4,9 +4,7 @@ import 'dart:async';
 import '../style.dart'; 
 import '../services/pigeon_service.dart'; 
 import '../models/pigeon_model.dart';
-// REAVALIAÇÃO COGNITIVA: Trocado para o banco unificado [cite: 2025-10-27]
 import '../database/pigeon_database.dart'; 
-import '../services/alert_listener.dart'; 
 
 class HomePigeon extends StatefulWidget {
   @override
@@ -18,9 +16,8 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
   final PigeonService _pigeonService = PigeonService(); 
   final TextEditingController _newChatController = TextEditingController();
   
-  final AlertListener _alertListener = AlertListener();
-  StreamSubscription? _alertSubscription;
-  
+  // ALÍVIO: Timer para busca automática (Polling) em vez de Sockets instáveis [cite: 2025-10-27]
+  Timer? _pollingTimer;
   String _currentDwellerId = "";
 
   @override
@@ -32,7 +29,8 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    _alertSubscription?.cancel();
+    // REAVALIAÇÃO COGNITIVA: Cancelar o timer é vital para evitar vazamento de memória [cite: 2025-10-27]
+    _pollingTimer?.cancel();
     _tabController.dispose();
     _newChatController.dispose();
     super.dispose();
@@ -49,86 +47,43 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     }
 
     if (dwellerId.isNotEmpty) {
-      _startActiveAlerts(dwellerId);
+      _startPollingMessages(dwellerId);
     }
   }
 
-  void _startActiveAlerts(String userId) {
-    _alertListener.startListening(userId);
-    
-    _alertSubscription = _alertListener.onMessageReceived.listen((hasNewData) {
-      if (hasNewData && mounted) {
-        print("🔔 [EnX] Sinal de paridade detectado. Atualizando interface...");
-        _handleRefresh(); 
+  // TRIUNFO: A cada 10 segundos, o App pergunta ao C++ se há novidades [cite: 2025-10-27]
+  void _startPollingMessages(String userId) {
+    _pollingTimer?.cancel(); // Limpa timers antigos por segurança
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+      if (mounted) {
+        print("🕊️ [Pigeon] Verificando novas mensagens via Polling...");
+        await _pigeonService.fetchMessages(userId: userId);
+        // Atualiza a UI se o usuário estiver na aba de CHATS
+        if (_tabController.index == 0) {
+          setState(() {}); 
+        }
       }
     });
   }
 
-  // TRIUNFO: Busca os chats recentes do banco unificado PigeonDatabase
   Future<List<Map<String, dynamic>>> _getCombinedMessages(String userId) async {
     if (userId.isEmpty) return [];
     
-    try {
-      // Tenta buscar novas mensagens no servidor C++
-      await _pigeonService.fetchMessages(userId: userId);
-    } catch (e) {
-      print("Offline ou Erro de conexão: Mantendo dados locais.");
-    }
-
-    // PARIDADE: Chama a função que agrupa por peer_id para a Home
+    // O fetchMessages agora é gerenciado pelo Timer, mas o Refresh manual continua disponível
     return await PigeonDatabase.instance.getRecentChats(userId); 
   }
 
   Future<void> _handleRefresh() async {
+    if (_currentDwellerId.isNotEmpty) {
+      await _pigeonService.fetchMessages(userId: _currentDwellerId);
+    }
     if (mounted) {
       setState(() {}); 
     }
-    return await Future.delayed(const Duration(milliseconds: 500)); 
   }
 
-  void _showNewChatDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: EnXStyle.backgroundBlack,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Adicionar", style: TextStyle(color: Colors.white, fontSize: 18)),
-        content: TextField(
-          controller: _newChatController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: "ID Pigeon...",
-            hintStyle: TextStyle(color: Colors.white24),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF25D366))),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF25D366), width: 2)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("CANCELAR", style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF25D366),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              if (_newChatController.text.isNotEmpty) {
-                String peerId = _newChatController.text;
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/chat', arguments: peerId);
-                _newChatController.clear();
-              }
-            },
-            child: const Text("INICIAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
+  // ... (Funções _showNewChatDialog, build e UI permanecem as mesmas, 
+  // apenas removendo referências ao AlertListener)
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +190,50 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
           Icon(Icons.explore_outlined, size: 80, color: EnXStyle.primaryBlue),
           SizedBox(height: 16),
           Text("Explore Dwellers", style: TextStyle(color: Colors.white54, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  void _showNewChatDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: EnXStyle.backgroundBlack,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Adicionar", style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: TextField(
+          controller: _newChatController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            hintText: "ID Pigeon...",
+            hintStyle: TextStyle(color: Colors.white24),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF25D366))),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF25D366), width: 2)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("CANCELAR", style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF25D366),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              if (_newChatController.text.isNotEmpty) {
+                String peerId = _newChatController.text;
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/chat', arguments: peerId);
+                _newChatController.clear();
+              }
+            },
+            child: const Text("INICIAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../services/alert_listener.dart'; // Certifique-se de que o caminho está correto
 
 class IntoSplashScreen extends StatefulWidget {
   @override
@@ -10,8 +9,6 @@ class IntoSplashScreen extends StatefulWidget {
 class _IntoSplashScreenState extends State<IntoSplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  // Instância do ouvinte de alertas do PigeonNotifier [cite: 2025-10-27]
-  final AlertListener _alertListener = AlertListener(); 
 
   @override
   void initState() {
@@ -23,21 +20,18 @@ class _IntoSplashScreenState extends State<IntoSplashScreen> with SingleTickerPr
 
     _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
 
-    // Inicia o processo de conexão em background
-    _startPigeonSync();
+    // Inicia apenas o delay visual antes da transição
+    _startTransition();
   }
 
-  void _startPigeonSync() {
+  void _startTransition() {
+    // Mantemos os 5 segundos para o usuário sentir a "sincronização" visual [cite: 2025-10-27]
     Timer(const Duration(seconds: 5), () {
       if (mounted) {
         final String? pubId = ModalRoute.of(context)?.settings.arguments as String?;
 
-        // REAVALIAÇÃO COGNITIVA: Ativamos a escuta do socket ANTES de ir para a Home [cite: 2025-10-27]
-        if (pubId != null && pubId != "---") {
-          _alertListener.startListening(pubId); // Conecta na rota /listen_alerts do C++
-          print("📡 [EnX] Escuta de alertas ativada para $pubId");
-        }
-
+        // TRIUNFO: Navegamos direto para a Home. 
+        // A busca de mensagens será feita via Timer na HomePigeon [cite: 2025-10-27].
         Navigator.pushReplacementNamed(
           context, 
           '/home_pigeon', 
@@ -55,7 +49,6 @@ class _IntoSplashScreenState extends State<IntoSplashScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    // Recupera o ID vindo do login para exibir na tela (Visual)
     final String pubId = ModalRoute.of(context)!.settings.arguments as String? ?? "---";
 
     return Scaffold(
