@@ -20,7 +20,7 @@ class _ChatViewState extends State<ChatView> {
   List<Map<String, dynamic>> _messages = []; 
   final PigeonService _pigeonService = PigeonService();
   
-  // REAVALIAÇÃO COGNITIVA: Timer de Polling substitui o AlertListener [cite: 2025-10-27]
+  // REAVALIAÇÃO COGNITIVA: Timer de Polling para paridade com o Replit [cite: 2025-10-27]
   Timer? _chatPollingTimer;
   
   String? _myId;
@@ -43,7 +43,7 @@ class _ChatViewState extends State<ChatView> {
       await _loadLocalHistory();
       await _syncWithServer(); 
 
-      // TRIUNFO: Ativa o Polling específico para a tela de chat (a cada 5 segundos)
+      // TRIUNFO: Busca novas mensagens a cada 5 segundos enquanto o chat estiver aberto [cite: 2025-10-27]
       _startChatPolling();
     } catch (e) {
       print("Erro ao inicializar chat: $e");
@@ -56,11 +56,9 @@ class _ChatViewState extends State<ChatView> {
     _chatPollingTimer?.cancel();
     _chatPollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       if (mounted && _myId != null) {
-        // Verifica se há novas mensagens no servidor
         int antes = _messages.length;
         await _syncWithServer();
         
-        // Se chegaram mensagens novas, dar feedback visual/sonoro
         if (_messages.length > antes) {
           if (await Vibration.hasVibrator() ?? false) Vibration.vibrate(duration: 50);
           try { await _audioPlayer.play(AssetSource('sounds/push.mp3')); } catch (_) {}
@@ -69,7 +67,6 @@ class _ChatViewState extends State<ChatView> {
     });
   }
 
-  // Restante da lógica de scroll e sincronização...
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -125,7 +122,6 @@ class _ChatViewState extends State<ChatView> {
 
   @override
   void dispose() {
-    // IMPORTANTE: Cancelar o timer para não gastar dados em background [cite: 2025-10-27]
     _chatPollingTimer?.cancel();
     _scrollController.dispose();
     _audioPlayer.dispose();
@@ -135,7 +131,6 @@ class _ChatViewState extends State<ChatView> {
 
   @override
   Widget build(BuildContext context) {
-    // O build permanece idêntico ao seu, garantindo a estética EnX
     return Scaffold(
       backgroundColor: EnXStyle.backgroundBlack,
       appBar: AppBar(
@@ -144,7 +139,8 @@ class _ChatViewState extends State<ChatView> {
         title: Row(
           children: [
             const CircleAvatar(
-              radius: 18, backgroundColor: Colors.white10, 
+              radius: 18, 
+              backgroundColor: Colors.white10, 
               child: Icon(Icons.person, color: Colors.white70, size: 20)
             ),
             const SizedBox(width: 12),
@@ -178,17 +174,24 @@ class _ChatViewState extends State<ChatView> {
 
   Widget _buildMessageBubble(Map<String, dynamic> msg) {
     bool isMe = msg['sender_id'] == _myId || msg['is_me'] == 1;
+    
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const Duration(vertical: 4) != null ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
+        // PONDERAÇÃO ÉTICA: Margem corrigida para evitar erro de compilação [cite: 2025-10-27]
+        margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          gradient: isMe ? const LinearGradient(colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)]) : null,
+          gradient: isMe 
+            ? const LinearGradient(colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)]) 
+            : null,
           color: isMe ? null : Colors.white10,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: Text(msg['content'] ?? "", style: const TextStyle(color: Colors.white, fontSize: 15)),
+        child: Text(
+          msg['content'] ?? "", 
+          style: const TextStyle(color: Colors.white, fontSize: 15)
+        ),
       ),
     );
   }
