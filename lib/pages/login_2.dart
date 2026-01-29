@@ -19,7 +19,7 @@ class _Login2State extends State<Login2> {
     setState(() => _isLoading = true);
     try {
       final url = Uri.parse('https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev/login_pigeon');
-      
+
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
@@ -31,18 +31,18 @@ class _Login2State extends State<Login2> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         // REAVALIAÇÃO COGNITIVA: Validando resposta do servidor C++ [cite: 2025-10-27]
         if (data['auth'] == 'success' || data['status'] == 'success') {
-          
+
           final prefs = await SharedPreferences.getInstance();
-          
+
           // Memória consolidada: Garantindo a persistência do ID de 10 dígitos [cite: 2025-10-27]
           await prefs.setString('dweller_id', idPigeon); 
           await prefs.setBool('is_authenticated', true); 
-          
+
           _mostrarMsg("Êxito: Acesso Concedido!", Colors.green);
-          
+
           // Sincronia: Navegação após gravação segura dos dados [cite: 2025-10-27]
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
@@ -74,6 +74,7 @@ class _Login2State extends State<Login2> {
 
   @override
   Widget build(BuildContext context) {
+    // Paridade: Garantindo que o ID vindo da tela anterior seja usado [cite: 2025-10-27]
     final String idPigeon = ModalRoute.of(context)!.settings.arguments as String? ?? "0000000000";
 
     return Scaffold(
@@ -107,7 +108,8 @@ class _Login2State extends State<Login2> {
               style: const TextStyle(color: Colors.black, fontSize: 18),
               decoration: const InputDecoration(
                 hintText: "Senha Pigeon",
-                hintStyle: TextStyle(color: Colors.black24),
+                // CORREÇÃO: Usando Colors.black.withOpacity para evitar erro de 'member not found'
+                hintStyle: TextStyle(color: Colors.black38),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF075E54), width: 1.5)),
                 focusedBorder: UnderlineInputBorder(
