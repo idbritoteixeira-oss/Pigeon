@@ -1,32 +1,34 @@
 class PigeonMessage {
   final String senderId;
+  final String? receiverId;
   final String content;
   final String timestamp;
-  final int isMe; // 1 para sim, 0 para não
+  final int isMe;
 
   PigeonMessage({
-    required this.senderId, 
-    required this.content, 
+    required this.senderId,
+    this.receiverId,
+    required this.content,
     required this.timestamp,
-    this.isMe = 0, // Por padrão, mensagens recebidas
+    this.isMe = 0,
   });
 
-  // Transforma o JSON do servidor C++ em objeto Dart
   factory PigeonMessage.fromJson(Map<String, dynamic> json) {
     return PigeonMessage(
       senderId: json['sender_id']?.toString() ?? 'Desconhecido',
+      receiverId: json['receiver_id']?.toString(),
       content: json['content']?.toString() ?? '',
-      timestamp: json['timestamp']?.toString() ?? DateTime.now().toIso8601String(),
+      timestamp: json['timestamp']?.toString() ?? 'Agora',
       isMe: json['is_me'] ?? 0,
     );
   }
 
-  // Converte para o formato que o Sqflite entende (Map)
   Map<String, dynamic> toMap(String currentDwellerId) {
     return {
-      'remote_id': '${senderId}_$timestamp', // Chave única para evitar duplicatas
-      'id_pigeon': currentDwellerId,          // O seu ID de 10 dígitos
+      'remote_id': '${senderId}_${timestamp}_${content.hashCode}',
+      'dweller_id': currentDwellerId,
       'sender_id': senderId,
+      'receiver_id': receiverId,
       'content': content,
       'timestamp': timestamp,
       'is_me': isMe,

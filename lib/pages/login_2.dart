@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../style.dart'; // Mantendo a soberania visual
+import '../style.dart';
 
 class Login2 extends StatefulWidget {
   @override
@@ -24,51 +24,57 @@ class _Login2State extends State<Login2> {
         url,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "id_pub": idPigeon, // Enviando o id_pigeon para o servidor
+          "id_pub": idPigeon, 
           "password": _passController.text,
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['auth'] == 'success') {
-          // --- CONSOLIDAÇÃO DA SESSÃO ---
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('is_authenticated', true); 
+        
+        // REAVALIAÇÃO COGNITIVA: Validando resposta do servidor C++ [cite: 2025-10-27]
+        if (data['auth'] == 'success' || data['status'] == 'success') {
           
-          // IMPORTANTE: Salvamos o idPigeon (0123456789) como dweller_id
-          // Isso evita que o sistema "pule" para a pub_id longa depois.
+          final prefs = await SharedPreferences.getInstance();
+          
+          // Memória consolidada: Garantindo a persistência do ID de 10 dígitos [cite: 2025-10-27]
           await prefs.setString('dweller_id', idPigeon); 
+          await prefs.setBool('is_authenticated', true); 
           
           _mostrarMsg("Êxito: Acesso Concedido!", Colors.green);
           
-          Navigator.pushReplacementNamed(
-            context, 
-            '/into_splash', 
-            arguments: idPigeon // Passando o ID correto adiante
-          );
+          // Sincronia: Navegação após gravação segura dos dados [cite: 2025-10-27]
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context, 
+              '/into_splash', 
+              (route) => false,
+              arguments: idPigeon
+            );
+          }
+        } else {
+          _mostrarMsg("Erro: Credenciais Inválidas", Colors.red);
         }
       } else {
-        _mostrarMsg("Erro: Senha Incorreta", Colors.red);
+        _mostrarMsg("Erro: Servidor não respondeu (Status ${response.statusCode})", Colors.red);
       }
     } catch (e) {
       _mostrarMsg("Erro de Conexão EnX", Colors.orange);
       print("Erro no Login: $e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _mostrarMsg(String texto, Color cor) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(texto), backgroundColor: cor),
+      SnackBar(content: Text(texto), backgroundColor: cor, duration: const Duration(seconds: 2)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Recebendo o ID (ex: 0123456789) vindo da tela anterior
-    final String idPigeon = ModalRoute.of(context)!.settings.arguments as String;
+    final String idPigeon = ModalRoute.of(context)!.settings.arguments as String? ?? "0000000000";
 
     return Scaffold(
       backgroundColor: Colors.white, 
@@ -87,25 +93,27 @@ class _Login2State extends State<Login2> {
         padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
         child: Column(
           children: [
+            const SizedBox(height: 20),
             Text(
               "O Pigeon $idPigeon foi localizado. Insira sua senha para autenticar sua sessão.",
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 15, color: Colors.black87),
             ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 40),
             TextField(
               controller: _passController,
               obscureText: true,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black),
+              style: const TextStyle(color: Colors.black, fontSize: 18),
               decoration: const InputDecoration(
-                hintText: "Senha",
-                hintStyle: TextStyle(color: Colors.black38),
+                hintText: "Senha Pigeon",
+                hintStyle: TextStyle(color: Colors.black24),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF075E54), width: 1.5)),
                 focusedBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF25D366), width: 2.0)),
               ),
+              onSubmitted: (_) => _finalizarLogin(idPigeon),
             ),
             const Spacer(),
             Align(
@@ -115,9 +123,11 @@ class _Login2State extends State<Login2> {
                 : FloatingActionButton(
                     onPressed: () => _finalizarLogin(idPigeon),
                     backgroundColor: const Color(0xFF25D366),
+                    elevation: 2,
                     child: const Icon(Icons.check, color: Colors.white),
                   ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

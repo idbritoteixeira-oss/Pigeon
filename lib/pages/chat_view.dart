@@ -173,12 +173,12 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> msg) {
+    // REAVALIAÇÃO COGNITIVA: Identificação precisa de quem enviou [cite: 2025-10-27]
     bool isMe = msg['sender_id'] == _myId || msg['is_me'] == 1;
     
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        // PONDERAÇÃO ÉTICA: Margem corrigida para evitar erro de compilação [cite: 2025-10-27]
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -188,9 +188,19 @@ class _ChatViewState extends State<ChatView> {
           color: isMe ? null : Colors.white10,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: Text(
-          msg['content'] ?? "", 
-          style: const TextStyle(color: Colors.white, fontSize: 15)
+        child: Column(
+          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              msg['content'] ?? "", 
+              style: const TextStyle(color: Colors.white, fontSize: 15)
+            ),
+            const SizedBox(height: 2),
+            Text(
+              msg['timestamp'] ?? "",
+              style: const TextStyle(color: Colors.white24, fontSize: 9),
+            )
+          ],
         ),
       ),
     );
@@ -212,6 +222,7 @@ class _ChatViewState extends State<ChatView> {
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(horizontal: 20),
               ),
+              onSubmitted: (_) => _sendMessage(),
             ),
           ),
           IconButton(

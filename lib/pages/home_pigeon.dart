@@ -16,7 +16,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
   final PigeonService _pigeonService = PigeonService(); 
   final TextEditingController _newChatController = TextEditingController();
   
-  // ALÍVIO: Timer para busca automática (Polling) em vez de Sockets instáveis [cite: 2025-10-27]
   Timer? _pollingTimer;
   String _currentDwellerId = "";
 
@@ -29,7 +28,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    // REAVALIAÇÃO COGNITIVA: Cancelar o timer é vital para evitar vazamento de memória [cite: 2025-10-27]
     _pollingTimer?.cancel();
     _tabController.dispose();
     _newChatController.dispose();
@@ -51,15 +49,15 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     }
   }
 
-  // TRIUNFO: A cada 10 segundos, o App pergunta ao C++ se há novidades [cite: 2025-10-27]
   void _startPollingMessages(String userId) {
-    _pollingTimer?.cancel(); // Limpa timers antigos por segurança
+    _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (mounted) {
-        print("🕊️ [Pigeon] Verificando novas mensagens via Polling...");
-        await _pigeonService.fetchMessages(userId: userId);
-        // Atualiza a UI se o usuário estiver na aba de CHATS
-        if (_tabController.index == 0) {
+        // Alívio: Busca mensagens em segundo plano [cite: 2025-10-27]
+        final newMessages = await _pigeonService.fetchMessages(userId: userId);
+        
+        // Se houver novas mensagens, forçamos a atualização da lista
+        if (newMessages.isNotEmpty && mounted) {
           setState(() {}); 
         }
       }
@@ -68,8 +66,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
 
   Future<List<Map<String, dynamic>>> _getCombinedMessages(String userId) async {
     if (userId.isEmpty) return [];
-    
-    // O fetchMessages agora é gerenciado pelo Timer, mas o Refresh manual continua disponível
+    // Busca o resumo das conversas para a Home [cite: 2025-10-27]
     return await PigeonDatabase.instance.getRecentChats(userId); 
   }
 
@@ -77,13 +74,8 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     if (_currentDwellerId.isNotEmpty) {
       await _pigeonService.fetchMessages(userId: _currentDwellerId);
     }
-    if (mounted) {
-      setState(() {}); 
-    }
+    if (mounted) setState(() {}); 
   }
-
-  // ... (Funções _showNewChatDialog, build e UI permanecem as mesmas, 
-  // apenas removendo referências ao AlertListener)
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +131,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
           return const Center(child: CircularProgressIndicator(color: Color(0xFF25D366)));
         } 
         
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return ListView( 
             physics: const AlwaysScrollableScrollPhysics(),
             children: const [
@@ -158,9 +150,10 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
             final String contactId = msg['peer_id'] ?? "Desconhecido";
 
             return ListTile(
-              leading: const CircleAvatar(
+              leading: CircleAvatar(
                 backgroundColor: Colors.white10,
-                child: Icon(Icons.person, color: Colors.white70),
+                child: Text(contactId.isNotEmpty ? contactId[0] : "?", 
+                  style: const TextStyle(color: Colors.white70)),
               ),
               title: Text(
                 "Habitante $contactId", 
@@ -171,9 +164,14 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white38, fontSize: 13)
               ),
-              trailing: const Icon(Icons.chevron_right, color: Colors.white12, size: 16),
+              // Mostra o timestamp formatado que corrigimos [cite: 2025-10-27]
+              trailing: Text(msg['timestamp'] ?? "", 
+                style: const TextStyle(color: Colors.white12, fontSize: 10)),
               onTap: () {
-                Navigator.pushNamed(context, '/chat', arguments: contactId);
+                Navigator.pushNamed(context, '/chat', arguments: contactId).then((_) {
+                  // Reatualiza a Home ao voltar do chat
+                  setState(() {});
+                });
               }, 
             );
           },
@@ -201,14 +199,14 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
       builder: (context) => AlertDialog(
         backgroundColor: EnXStyle.backgroundBlack,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Adicionar", style: TextStyle(color: Colors.white, fontSize: 18)),
+        title: const Text("Novo Chat", style: TextStyle(color: Colors.white, fontSize: 18)),
         content: TextField(
           controller: _newChatController,
           autofocus: true,
           style: const TextStyle(color: Colors.white),
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-            hintText: "ID Pigeon...",
+            hintText: "ID do Habitante...",
             hintStyle: TextStyle(color: Colors.white24),
             enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF25D366))),
             focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF25D366), width: 2)),
@@ -228,7 +226,9 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
               if (_newChatController.text.isNotEmpty) {
                 String peerId = _newChatController.text;
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/chat', arguments: peerId);
+                Navigator.pushNamed(context, '/chat', arguments: peerId).then((_) {
+                  setState(() {});
+                });
                 _newChatController.clear();
               }
             },
