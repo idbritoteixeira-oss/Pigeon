@@ -29,9 +29,9 @@ class PigeonDatabase {
       CREATE TABLE messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         remote_id TEXT UNIQUE,   
-        dweller_id TEXT,         -- Seu ID (Dono da conta no dispositivo)
-        peer_id TEXT,            -- ID do contato (Com quem você conversa)
-        sender_id TEXT,          -- Quem de fato enviou
+        dweller_id TEXT,         -- Seu ID (Dono da conta)
+        peer_id TEXT,            -- ID do contato
+        sender_id TEXT,          -- Quem enviou
         content TEXT,            
         timestamp TEXT,
         is_me INTEGER            -- 1 para enviadas, 0 para recebidas
@@ -39,21 +39,28 @@ class PigeonDatabase {
     ''');
   }
 
-  // TRIUNFO: Salva organizando a paridade de quem é o contato
+  // TRIUNFO: Salva organizando a paridade e tratando campos nulos [cite: 2025-10-27]
   Future<int> saveMessage(Map<String, dynamic> row, String currentDwellerId) async {
     final db = await instance.database;
     final Map<String, dynamic> mutableRow = Map.from(row);
 
-    // Garante que a mensagem pertença ao usuário logado
+    // Garante a Memória-consolidada do dono da conta [cite: 2025-10-27]
     mutableRow['dweller_id'] = currentDwellerId;
 
-    // Lógica de Peer: Se eu enviei (is_me=1), o peer é quem recebe. 
-    // Se eu recebi, o peer é quem enviou.
+    // REAVALIAÇÃO COGNITIVA: O peer_id é essencial para agrupar conversas [cite: 2025-10-27]
     if (mutableRow['peer_id'] == null || mutableRow['peer_id'] == "") {
-      mutableRow['peer_id'] = (mutableRow['is_me'] == 1) 
-          ? mutableRow['receiver_id'] 
-          : mutableRow['sender_id'];
+      // Se eu enviei (is_me=1), o peer é para quem eu mandei (receiver_id)
+      // Se eu recebi, o peer é quem me mandou (sender_id)
+      if (mutableRow['is_me'] == 1) {
+        mutableRow['peer_id'] = mutableRow['receiver_id'] ?? "Desconhecido";
+      } else {
+        mutableRow['peer_id'] = mutableRow['sender_id'] ?? "Desconhecido";
+      }
     }
+
+    // REMOÇÃO DE RESÍDUO: Removemos campos que não existem na tabela antes de inserir
+    // Isso evita o erro de "table has no column named receiver_id"
+    mutableRow.remove('receiver_id');
 
     return await db.insert(
       'messages', 
@@ -62,21 +69,19 @@ class PigeonDatabase {
     );
   }
 
-  // --- PARA O CHATVIEW: Histórico COMPLETO (Bombardeio) ---
   Future<List<Map<String, dynamic>>> getChatHistory(String myId, String peerId) async {
     final db = await instance.database;
-    // Sem GROUP BY para trazer todas as mensagens da conversa
     return await db.query(
       'messages',
       where: 'dweller_id = ? AND peer_id = ?',
       whereArgs: [myId, peerId],
-      orderBy: 'id ASC' // Ordem cronológica
+      orderBy: 'id ASC'
     );
   }
 
-  // --- PARA A HOME: Resumo das conversas ---
   Future<List<Map<String, dynamic>>> getRecentChats(String myId) async {
     final db = await instance.database;
+    // PARIDADE: Retorna o último registro de cada peer para a Home [cite: 2025-10-27]
     return await db.rawQuery('''
       SELECT * FROM messages 
       WHERE dweller_id = ? 
