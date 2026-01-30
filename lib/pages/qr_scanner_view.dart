@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
+import 'package:permission_handler/permission_handler.dart'; // Importação essencial
 
 class QrScannerView extends StatefulWidget {
   @override
@@ -11,6 +12,20 @@ class _QrScannerViewState extends State<QrScannerView> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   QRViewController? controller;
   bool isFlashOn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestPermission(); // REGULAÇÃO COMPORTAMENTAL: Garante o acesso imediato [cite: 2025-10-27]
+  }
+
+  // ALÍVIO: Resolve o bloqueio silencioso do Android 13+ [cite: 2025-10-27]
+  Future<void> _requestPermission() async {
+    var status = await Permission.camera.status;
+    if (!status.isGranted) {
+      await Permission.camera.request();
+    }
+  }
 
   @override
   void reassemble() {
@@ -28,7 +43,6 @@ class _QrScannerViewState extends State<QrScannerView> {
       body: Stack(
         children: [
           _buildQrView(context),
-          // Interface de controle para forçar a paridade com o hardware [cite: 2025-10-27]
           Positioned(
             top: 40,
             left: 20,
@@ -44,12 +58,11 @@ class _QrScannerViewState extends State<QrScannerView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Botão para alternar entre as 3 câmeras traseiras [cite: 2025-10-27]
                 _scannerActionButton(
                   icon: Icons.flip_camera_ios,
                   onPressed: () async {
+                    // PONDERAÇÃO ÉTICA: Alterna entre Rear 1, 2 e 3 [cite: 2025-10-27]
                     await controller?.flipCamera();
-                    // Alívio: Força o driver a reiniciar na nova lente [cite: 2025-10-27]
                     await controller?.resumeCamera();
                   },
                 ),
@@ -85,9 +98,10 @@ class _QrScannerViewState extends State<QrScannerView> {
 
   void _onQRViewCreated(QRViewController controller) {
     this.controller = controller;
-    // Ponderação Ética: Delay necessário para estabilizar o driver multi-lente [cite: 2025-10-27]
-    Future.delayed(const Duration(milliseconds: 600), () {
-      controller.resumeCamera();
+    
+    // REAVALIAÇÃO COGNITIVA: Delay otimizado baseado em fóruns (1.2s) [cite: 2025-10-27]
+    Future.delayed(const Duration(milliseconds: 1200), () async {
+      await controller.resumeCamera();
     });
 
     controller.scannedDataStream.listen((scanData) {
