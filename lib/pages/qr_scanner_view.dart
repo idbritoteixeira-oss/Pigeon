@@ -24,9 +24,15 @@ class _QrScannerViewState extends State<QrScannerView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text("Escanear Dweller ID", style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF0F1013),
+      ),
       body: QRView(
         key: qrKey,
         onQRViewCreated: _onQRViewCreated,
+        // Força a câmera traseira inicial
+        cameraFacing: CameraFacing.back, 
         overlay: QrScannerOverlayShape(
           borderColor: const Color(0xFF25D366),
           borderRadius: 10,
@@ -40,6 +46,14 @@ class _QrScannerViewState extends State<QrScannerView> {
 
   void _onQRViewCreated(QRViewController controller) {
     this.controller = controller;
+
+    // REAVALIAÇÃO COGNITIVA: Delay para dispositivos multi-camera renegociarem o driver
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      await controller.resumeCamera();
+      // TRIUNFO: Tenta alternar a câmera se a primeira falhar (opcional, mas ajuda)
+      // await controller.flipCamera(); 
+    });
+
     controller.scannedDataStream.listen((scanData) {
       if (scanData.code != null) {
         controller.pauseCamera();
