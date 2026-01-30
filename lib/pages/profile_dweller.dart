@@ -81,11 +81,11 @@ class _ProfileDwellerState extends State<ProfileDweller> {
             ),
             const SizedBox(height: 16),
             Text(
-              "Habitante $peerId",
+              "Nome: $peerId",
               style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
             ),
             Text(
-              _checkingStatus ? "Verificando sinal..." : (_isOnline ? "Protocolo Pigeon Ativo" : "Protocolo em Hibernação"),
+              _checkingStatus ? "Verificando sinal..." : (_isOnline ? "Online" : " "),
               style: TextStyle(
                 color: _isOnline ? const Color(0xFF25D366) : Colors.white38, 
                 fontSize: 14, 
@@ -95,12 +95,12 @@ class _ProfileDwellerState extends State<ProfileDweller> {
 
             const SizedBox(height: 40),
 
-            _buildInfoTile(Icons.fingerprint, "ID de Cidadão", peerId),
-            _buildInfoTile(Icons.security, "Criptografia", "Ponto-a-Ponto (Janeway)"),
+            _buildInfoTile(Icons.fingerprint, "ID", peerId),
+            _buildInfoTile(Icons.security, "Criptografia", "Start-To-End (EnX603)"),
             _buildInfoTile(
               _isOnline ? Icons.location_on : Icons.location_off, 
               "Status de Rede", 
-              _isOnline ? "Conectado ao Setor EnX" : "Sinal Perdido"
+              _isOnline ? "Conectado ao EnX" : "Sinal Perdido"
             ),
 
             const SizedBox(height: 30),
@@ -116,7 +116,7 @@ class _ProfileDwellerState extends State<ProfileDweller> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 icon: const Icon(Icons.delete_sweep),
-                label: const Text("LIMPAR MEMÓRIA-SEGMENTADA"),
+                label: const Text("LIMPAR CONVERSA"),
                 onPressed: () => _confirmClearChat(context, peerId),
               ),
             ),
@@ -156,7 +156,7 @@ class _ProfileDwellerState extends State<ProfileDweller> {
       builder: (context) => AlertDialog(
         backgroundColor: EnXStyle.backgroundBlack,
         title: const Text("Limpar Conversa?", style: TextStyle(color: Colors.white)),
-        content: const Text("Isso apagará todas as mensagens locais com este habitante. Esta ação é irreversível.", 
+        content: const Text("Isso apagará todas as mensagens locais. Esta ação é irreversível.", 
           style: TextStyle(color: Colors.white54)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCELAR")),
