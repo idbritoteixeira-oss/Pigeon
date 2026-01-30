@@ -1,11 +1,46 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pigeon_model.dart';
 // REAVALIAÇÃO COGNITIVA: Foco total no banco SQLite unificado [cite: 2025-10-27]
 import '../database/pigeon_database.dart'; 
 
 class PigeonService {
   final String baseUrl = "https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev"; 
+
+  // REAVALIAÇÃO COGNITIVA: Estado global de conexão baseado no Poll
+  static bool isSystemOnline = false; 
+
+  // --- MÓDULO DE IDENTIDADE & PERFIL ---
+
+  // Salva o Nome Global (Ponderação Ética sobre identidade) [cite: 2025-10-27]
+  Future<void> setGlobalName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pigeon_name', name);
+  }
+
+  // Recupera o Nome Global da Memória Consolidada
+  Future<String> getGlobalName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('pigeon_name') ?? "Usuário Pigeon";
+  }
+
+  // Logout: Limpa a Memória-segmentada e encerra a sessão
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Alívio: Remove os dados sensíveis para garantir o livre-arbítrio de saída [cite: 2025-10-27]
+    await prefs.remove('dweller_id');
+    await prefs.remove('pigeon_name');
+    await prefs.remove('is_authenticated'); // Ajustado para paridade com o seu main.dart
+    isSystemOnline = false; 
+  }
+
+  // Status/Última vez: Simula a paridade de conexão
+  String getOnlineStatus() {
+    return isSystemOnline ? "Online agora" : "Desconectado";
+  }
+
+  // --- MÓDULO DE COMUNICAÇÃO ---
 
   Future<bool> activatePigeon({required String idPigeon, required String password}) async {
     try {
@@ -19,6 +54,7 @@ class PigeonService {
       );
       return response.statusCode == 200;
     } catch (e) {
+      isSystemOnline = false;
       return false;
     }
   }
@@ -33,8 +69,13 @@ class PigeonService {
           "password": password
         }),
       );
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        isSystemOnline = true;
+        return true;
+      }
+      return false;
     } catch (e) {
+      isSystemOnline = false;
       return false;
     }
   }
@@ -47,22 +88,25 @@ class PigeonService {
         Uri.parse('$baseUrl/fetch_messages'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"user_id": userId}), 
-      );
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
+        // REGULAÇÃO COMPORTAMENTAL: Poll bem-sucedido ativa o indicador visual [cite: 2025-10-27]
+        isSystemOnline = true; 
+
         List<dynamic> body = jsonDecode(response.body);
         List<PigeonMessage> messages = body.map((item) => PigeonMessage.fromJson(item)).toList();
 
         for (var msg in messages) {
-          // Salvando no banco local para garantir a persistência [cite: 2025-10-27]
+          // Salva no SQLite garantindo paridade
           await PigeonDatabase.instance.saveMessage(
             msg.toMap(userId), 
             userId
           ); 
         }
 
-        // Alívio: Limpa a fila no servidor após garantir a persistência local [cite: 2025-10-27]
         if (messages.isNotEmpty) {
+          // Limpa as mensagens do servidor após baixar para o dispositivo local
           await http.post(
             Uri.parse('$baseUrl/confirm_clear'),
             headers: {"Content-Type": "application/json"},
@@ -70,22 +114,24 @@ class PigeonService {
           );
         }
         return messages;
+      } else {
+        isSystemOnline = false;
+        return [];
       }
-      return [];
     } catch (e) {
+      isSystemOnline = false;
       print("Erro ao buscar mensagens: $e");
       return [];
     }
   }
 
-  // TRIUNFO: Envio de mensagem com timestamp real formatado [cite: 2025-10-27]
+  // TRIUNFO: Envio de mensagem com timestamp real formatado
   Future<bool> sendMessage({
     required String senderId, 
     required String receiverId, 
     required String content
   }) async {
     try {
-      // REAVALIAÇÃO COGNITIVA: Gerando data e hora real para substituir o "AGORA" [cite: 2025-10-27]
       final DateTime now = DateTime.now();
       final String formattedTime = 
           "${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
@@ -97,20 +143,22 @@ class PigeonService {
           "sender_id": senderId, 
           "id_pigeon": receiverId, 
           "content": content,
-          "timestamp": formattedTime, // Envia o horário real para o C++
+          "timestamp": formattedTime, 
         }),
       );
       
       if (response.statusCode == 200) {
-        // Ponderação ética: Atualiza o banco local imediatamente com o horário real [cite: 2025-10-27]
+        isSystemOnline = true; 
+
         final myMessage = PigeonMessage(
           senderId: senderId,
-          receiverId: receiverId, // Adicionado para facilitar o mapeamento do peer_id
+          receiverId: receiverId, 
           content: content,
           timestamp: formattedTime,
           isMe: 1,
         );
 
+        // Salva na Memória Consolidada Local
         await PigeonDatabase.instance.saveMessage(
           myMessage.toMap(senderId), 
           senderId
@@ -119,6 +167,7 @@ class PigeonService {
       }
       return false;
     } catch (e) {
+      isSystemOnline = false;
       print("Erro no envio Pigeon: $e");
       return false;
     }

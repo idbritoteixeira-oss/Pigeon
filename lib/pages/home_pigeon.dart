@@ -5,6 +5,7 @@ import '../style.dart';
 import '../services/pigeon_service.dart'; 
 import '../models/pigeon_model.dart';
 import '../database/pigeon_database.dart'; 
+import 'qr_scanner_view.dart'; 
 
 class HomePigeon extends StatefulWidget {
   @override
@@ -53,10 +54,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (mounted) {
-        // Alívio: Busca mensagens em segundo plano [cite: 2025-10-27]
         final newMessages = await _pigeonService.fetchMessages(userId: userId);
-        
-        // Se houver novas mensagens, forçamos a atualização da lista
         if (newMessages.isNotEmpty && mounted) {
           setState(() {}); 
         }
@@ -66,7 +64,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
 
   Future<List<Map<String, dynamic>>> _getCombinedMessages(String userId) async {
     if (userId.isEmpty) return [];
-    // Busca o resumo das conversas para a Home [cite: 2025-10-27]
     return await PigeonDatabase.instance.getRecentChats(userId); 
   }
 
@@ -77,6 +74,17 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     if (mounted) setState(() {}); 
   }
 
+  void _openQrScanner() async {
+    final String? scannedId = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => QrScannerView()),
+    );
+
+    if (scannedId != null && scannedId.isNotEmpty) {
+      Navigator.pushNamed(context, '/chat', arguments: scannedId).then((_) => setState(() {}));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,13 +92,16 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
       appBar: AppBar(
         backgroundColor: EnXStyle.primaryBlue, 
         automaticallyImplyLeading: false, 
-        title: const Text("Pigeon", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        actions: [
-          Center(child: Padding(
-            padding: const EdgeInsets.only(right: 15),
-            child: Text(_currentDwellerId, style: const TextStyle(color: Colors.white38, fontSize: 12)),
-          ))
-        ],
+        title: Row(
+          children: [
+            const Text("Pigeon", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(width: 10),
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner, color: Colors.white70, size: 20),
+              onPressed: _openQrScanner,
+            ),
+          ],
+        ),
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
@@ -148,12 +159,34 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
           itemBuilder: (context, index) {
             final msg = messages[index];
             final String contactId = msg['peer_id'] ?? "Desconhecido";
+            
+            // Lógica injetada para Status e Badges
+            bool isUserOnline = PigeonService.isSystemOnline; // Status baseado no poll real
+            int unreadCount = msg['unread_count'] ?? 0; // Quantidade de novas mensagens
 
             return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.white10,
-                child: Text(contactId.isNotEmpty ? contactId[0] : "?", 
-                  style: const TextStyle(color: Colors.white70)),
+              leading: Stack(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.white10,
+                    child: Text(contactId.isNotEmpty ? contactId[0] : "?", 
+                      style: const TextStyle(color: Colors.white70)),
+                  ),
+                  if (isUserOnline)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF25D366),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: EnXStyle.backgroundBlack, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               title: Text(
                 "Habitante $contactId", 
@@ -164,14 +197,30 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white38, fontSize: 13)
               ),
-              // Mostra o timestamp formatado que corrigimos [cite: 2025-10-27]
-              trailing: Text(msg['timestamp'] ?? "", 
-                style: const TextStyle(color: Colors.white12, fontSize: 10)),
+              // TRIUNFO: Trailing atualizado com Badge de novas mensagens
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(msg['timestamp'] ?? "", 
+                    style: const TextStyle(color: Colors.white12, fontSize: 10)),
+                  if (unreadCount > 0)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF25D366),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        unreadCount.toString(),
+                        style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
               onTap: () {
-                Navigator.pushNamed(context, '/chat', arguments: contactId).then((_) {
-                  // Reatualiza a Home ao voltar do chat
-                  setState(() {});
-                });
+                Navigator.pushNamed(context, '/chat', arguments: contactId).then((_) => setState(() {}));
               }, 
             );
           },
@@ -226,9 +275,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
               if (_newChatController.text.isNotEmpty) {
                 String peerId = _newChatController.text;
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/chat', arguments: peerId).then((_) {
-                  setState(() {});
-                });
+                Navigator.pushNamed(context, '/chat', arguments: peerId).then((_) => setState(() {}));
                 _newChatController.clear();
               }
             },

@@ -63,6 +63,8 @@ class _ChatViewState extends State<ChatView> {
           if (await Vibration.hasVibrator() ?? false) Vibration.vibrate(duration: 50);
           try { await _audioPlayer.play(AssetSource('sounds/push.mp3')); } catch (_) {}
         }
+        // REGULAÇÃO COMPORTAMENTAL: Atualiza a bolinha de status se o poll mudar
+        if (mounted) setState(() {});
       }
     });
   }
@@ -138,10 +140,35 @@ class _ChatViewState extends State<ChatView> {
         elevation: 0,
         title: Row(
           children: [
-            const CircleAvatar(
-              radius: 18, 
-              backgroundColor: Colors.white10, 
-              child: Icon(Icons.person, color: Colors.white70, size: 20)
+            // TRIUNFO: Ícone com bolinha de status e clique para perfil [cite: 2025-10-27]
+            GestureDetector(
+              onTap: () {
+                // Abre o perfil do Habitante ao clicar na foto
+                Navigator.pushNamed(context, '/profile_dweller', arguments: _peerId);
+              },
+              child: Stack(
+                children: [
+                  const CircleAvatar(
+                    radius: 18, 
+                    backgroundColor: Colors.white10, 
+                    child: Icon(Icons.person, color: Colors.white70, size: 20)
+                  ),
+                  if (PigeonService.isSystemOnline)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF25D366),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: EnXStyle.primaryBlue, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(width: 12),
             Column(

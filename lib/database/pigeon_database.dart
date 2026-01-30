@@ -19,47 +19,51 @@ class PigeonDatabase {
 
     return await openDatabase(
       path, 
-      version: 1, 
-      onCreate: _createDB
+      version: 2, // Aumentamos a versão para disparar o onUpgrade se necessário
+      onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
   }
 
+  // REAVALIAÇÃO COGNITIVA: Adicionado campo is_read (0=não lido, 1=lido) [cite: 2025-10-27]
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         remote_id TEXT UNIQUE,   
-        dweller_id TEXT,         -- Seu ID (Dono da conta)
-        peer_id TEXT,            -- ID do contato
-        sender_id TEXT,          -- Quem enviou
+        dweller_id TEXT,         
+        peer_id TEXT,            
+        sender_id TEXT,          
         content TEXT,            
         timestamp TEXT,
-        is_me INTEGER            -- 1 para enviadas, 0 para recebidas
+        is_me INTEGER,            
+        is_read INTEGER DEFAULT 0 
       )
     ''');
   }
 
-  // TRIUNFO: Salva organizando a paridade e tratando campos nulos [cite: 2025-10-27]
+  // Tratativa para atualizar bancos existentes sem perder dados
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE messages ADD COLUMN is_read INTEGER DEFAULT 0');
+    }
+  }
+
   Future<int> saveMessage(Map<String, dynamic> row, String currentDwellerId) async {
     final db = await instance.database;
     final Map<String, dynamic> mutableRow = Map.from(row);
 
-    // Garante a Memória-consolidada do dono da conta [cite: 2025-10-27]
     mutableRow['dweller_id'] = currentDwellerId;
 
-    // REAVALIAÇÃO COGNITIVA: O peer_id é essencial para agrupar conversas [cite: 2025-10-27]
     if (mutableRow['peer_id'] == null || mutableRow['peer_id'] == "") {
-      // Se eu enviei (is_me=1), o peer é para quem eu mandei (receiver_id)
-      // Se eu recebi, o peer é quem me mandou (sender_id)
       if (mutableRow['is_me'] == 1) {
         mutableRow['peer_id'] = mutableRow['receiver_id'] ?? "Desconhecido";
+        mutableRow['is_read'] = 1; // Mensagens que EU envio já nascem lidas
       } else {
         mutableRow['peer_id'] = mutableRow['sender_id'] ?? "Desconhecido";
       }
     }
 
-    // REMOÇÃO DE RESÍDUO: Removemos campos que não existem na tabela antes de inserir
-    // Isso evita o erro de "table has no column named receiver_id"
     mutableRow.remove('receiver_id');
 
     return await db.insert(
@@ -69,8 +73,22 @@ class PigeonDatabase {
     );
   }
 
+  // TRIUNFO: Marca mensagens como lidas ao abrir o chat [cite: 2025-10-27]
+  Future<void> markAsRead(String myId, String peerId) async {
+    final db = await instance.database;
+    await db.update(
+      'messages',
+      {'is_read': 1},
+      where: 'dweller_id = ? AND peer_id = ? AND is_me = 0',
+      whereArgs: [myId, peerId],
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getChatHistory(String myId, String peerId) async {
     final db = await instance.database;
+    // Ao buscar o histórico, aproveitamos para marcar como lido
+    await markAsRead(myId, peerId);
+    
     return await db.query(
       'messages',
       where: 'dweller_id = ? AND peer_id = ?',
@@ -79,15 +97,20 @@ class PigeonDatabase {
     );
   }
 
+  // PARIDADE: Retorna o último registro E a contagem de não lidos [cite: 2025-10-27]
   Future<List<Map<String, dynamic>>> getRecentChats(String myId) async {
     final db = await instance.database;
-    // PARIDADE: Retorna o último registro de cada peer para a Home [cite: 2025-10-27]
     return await db.rawQuery('''
-      SELECT * FROM messages 
-      WHERE dweller_id = ? 
-      GROUP BY peer_id 
-      ORDER BY id DESC
-    ''', [myId]);
+      SELECT m1.*, 
+      (SELECT COUNT(*) FROM messages m2 WHERE m2.peer_id = m1.peer_id AND m2.is_read = 0 AND m2.dweller_id = ?) as unread_count
+      FROM messages m1
+      WHERE m1.id IN (
+          SELECT MAX(id) FROM messages 
+          WHERE dweller_id = ? 
+          GROUP BY peer_id
+      )
+      ORDER BY m1.id DESC
+    ''', [myId, myId]);
   }
 
   Future<void> deleteMessage(int id) async {

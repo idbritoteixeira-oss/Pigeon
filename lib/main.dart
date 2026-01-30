@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; 
 import 'style.dart'; 
+
+// Importação das páginas originais
 import 'pages/splashscreen.dart';
 import 'pages/intoSplashscreen.dart'; 
 import 'pages/login.dart';
@@ -8,6 +10,12 @@ import 'pages/login_2.dart';
 import 'pages/register_key.dart';
 import 'pages/home_pigeon.dart'; 
 import 'pages/chat_view.dart';
+
+// INJEÇÃO DAS NOVAS PÁGINAS: Conexão e Identidade [cite: 2025-10-27]
+import 'pages/profile_view.dart';      // Seu perfil (Dono da conta)
+import 'pages/profile_dweller.dart';   // Perfil do contato (Habitante)
+import 'pages/qr_scanner_view.dart';   // Scanner de conexões
+
 // REAVALIAÇÃO COGNITIVA: Trocado para o banco unificado PigeonDatabase
 import 'database/pigeon_database.dart'; 
 
@@ -27,8 +35,10 @@ void main() async {
     debugShowCheckedModeBanner: false,
     title: 'Pigeon EnX',
     theme: EnXStyle.theme, 
+    
     // Se estiver autenticado e tiver um ID, vai direto para a Home
     initialRoute: (isAuthenticated && dwellerId.isNotEmpty) ? '/home_pigeon' : '/',
+    
     routes: {
       '/': (context) => SplashScreen(),
       '/login': (context) => Login(),
@@ -37,6 +47,11 @@ void main() async {
       '/into_splash': (context) => IntoSplashScreen(), 
       '/home_pigeon': (context) => HomePigeon(),
       '/chat': (context) => ChatView(),
+      
+      // NOVAS ROTAS INJETADAS PARA O ENX OS [cite: 2025-10-27]
+      '/profile_view': (context) => ProfileView(),        // Rota do seu perfil
+      '/profile_dweller': (context) => ProfileDweller(),  // Rota do perfil de quem você conversa
+      '/qr_scanner': (context) => QrScannerView(),        // Rota do scanner de QR
     },
   ));
 }
