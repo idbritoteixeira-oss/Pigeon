@@ -26,7 +26,7 @@ if (flutterVersionName == null) {
 android {
     namespace = "com.labsenx.pigeon"
     // Atualizado para a versão estável mais recente suportada pelo robô [cite: 2026-01-26]
-    compileSdk = 34
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
