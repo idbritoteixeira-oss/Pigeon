@@ -24,7 +24,7 @@ dependencies:
   device_info_plus: ^11.3.0
   path_provider: ^2.0.5
   uuid: ^4.5.2
-  qr_code_scanner: ^1.0.1
+  qr_code_scanner_plus: ^2.0.14
   qr_flutter: ^4.1.0
 
 dev_dependencies:
