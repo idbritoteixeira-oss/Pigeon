@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     // Pequeno delay para o som ser ouvido antes da troca de tela
-    await Future.delayed(Duration(milliseconds: 1200));
+    await Future.delayed(Duration(milliseconds: 1500));
     
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/login');
