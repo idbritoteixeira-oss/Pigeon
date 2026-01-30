@@ -19,13 +19,13 @@ class PigeonDatabase {
 
     return await openDatabase(
       path, 
-      version: 2, // Aumentamos a versão para disparar o onUpgrade se necessário
+      version: 3, // TRIUNFO: Versão 3 com suporte a índices e tipos de mídia
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
-  // REAVALIAÇÃO COGNITIVA: Adicionado campo is_read (0=não lido, 1=lido) [cite: 2025-10-27]
+  // REAVALIAÇÃO COGNITIVA: Estrutura completa para garantir paridade total [cite: 2025-10-27]
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE messages (
@@ -37,15 +37,28 @@ class PigeonDatabase {
         content TEXT,            
         timestamp TEXT,
         is_me INTEGER,            
-        is_read INTEGER DEFAULT 0 
+        is_read INTEGER DEFAULT 0,
+        type TEXT DEFAULT 'text'
       )
     ''');
+
+    // Performance: Índice para buscas rápidas em conversas grandes
+    await db.execute('CREATE INDEX idx_dweller_peer ON messages (dweller_id, peer_id)');
   }
 
-  // Tratativa para atualizar bancos existentes sem perder dados
+  // TRATATIVA: Evolução do banco sem perda de dados (Alívio)
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE messages ADD COLUMN is_read INTEGER DEFAULT 0');
+    }
+    if (oldVersion < 3) {
+      // Injeção de paridade para novas funcionalidades
+      try {
+        await db.execute("ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'");
+        await db.execute('CREATE INDEX idx_dweller_peer ON messages (dweller_id, peer_id)');
+      } catch (e) {
+        print("Aviso: Campos v3 já existiam.");
+      }
     }
   }
 
@@ -58,7 +71,7 @@ class PigeonDatabase {
     if (mutableRow['peer_id'] == null || mutableRow['peer_id'] == "") {
       if (mutableRow['is_me'] == 1) {
         mutableRow['peer_id'] = mutableRow['receiver_id'] ?? "Desconhecido";
-        mutableRow['is_read'] = 1; // Mensagens que EU envio já nascem lidas
+        mutableRow['is_read'] = 1; 
       } else {
         mutableRow['peer_id'] = mutableRow['sender_id'] ?? "Desconhecido";
       }
@@ -73,7 +86,6 @@ class PigeonDatabase {
     );
   }
 
-  // TRIUNFO: Marca mensagens como lidas ao abrir o chat [cite: 2025-10-27]
   Future<void> markAsRead(String myId, String peerId) async {
     final db = await instance.database;
     await db.update(
@@ -84,9 +96,18 @@ class PigeonDatabase {
     );
   }
 
+  // TRIUNFO: Método essencial para o ProfileDweller (Livre-arbítrio) [cite: 2025-10-27]
+  Future<void> clearChat(String myId, String peerId) async {
+    final db = await instance.database;
+    await db.delete(
+      'messages', 
+      where: 'dweller_id = ? AND peer_id = ?', 
+      whereArgs: [myId, peerId]
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getChatHistory(String myId, String peerId) async {
     final db = await instance.database;
-    // Ao buscar o histórico, aproveitamos para marcar como lido
     await markAsRead(myId, peerId);
     
     return await db.query(
@@ -97,7 +118,6 @@ class PigeonDatabase {
     );
   }
 
-  // PARIDADE: Retorna o último registro E a contagem de não lidos [cite: 2025-10-27]
   Future<List<Map<String, dynamic>>> getRecentChats(String myId) async {
     final db = await instance.database;
     return await db.rawQuery('''

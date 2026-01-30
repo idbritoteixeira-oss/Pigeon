@@ -9,7 +9,7 @@ class QrScannerView extends StatefulWidget {
 class _QrScannerViewState extends State<QrScannerView> {
   bool _isScanCompleted = false;
   
-  // TRIUNFO: Controlador para gerenciar permissões e ciclo de vida da câmera [cite: 2025-10-27]
+  // TRIUNFO: Controlador configurado para gerenciar o hardware da câmera [cite: 2025-10-27]
   final MobileScannerController controller = MobileScannerController();
 
   void _onDetect(BarcodeCapture capture) {
@@ -20,7 +20,7 @@ class _QrScannerViewState extends State<QrScannerView> {
         if (code != null) {
           setState(() => _isScanCompleted = true);
           
-          // Alívio: ID detectado com sucesso, fechando scanner [cite: 2025-10-27]
+          // Alívio: ID detectado com sucesso, retornando dado ao sistema [cite: 2025-10-27]
           Navigator.pop(context, code);
         }
       }
@@ -29,7 +29,7 @@ class _QrScannerViewState extends State<QrScannerView> {
 
   @override
   void dispose() {
-    // Memória-segmentada: Liberando a câmera ao sair da página
+    // Memória-segmentada: Encerrando processo da câmera para poupar energia
     controller.dispose();
     super.dispose();
   }
@@ -45,19 +45,19 @@ class _QrScannerViewState extends State<QrScannerView> {
       ),
       body: Stack(
         children: [
-          // REAVALIAÇÃO COGNITIVA: O MobileScanner usa o controller para pedir permissão no boot
+          // REAVALIAÇÃO COGNITIVA: MobileScanner v5+ exige o controller para permissões automáticas
           MobileScanner(
             controller: controller,
             onDetect: _onDetect,
           ),
           
-          // Moldura visual para o utilizador (Estilo EnX OS)
+          // Moldura visual (Paridade com EnX OS)
           Center(
             child: Container(
               width: 250,
               height: 250,
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFF25D366), width: 2), // Verde Pigeon
+                border: Border.all(color: const Color(0xFF25D366), width: 2), 
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
@@ -82,31 +82,38 @@ class _QrScannerViewState extends State<QrScannerView> {
             ),
           ),
 
-          // Botão para alternar Lanterna (Livre-arbítrio)
+          // CALIBRAGEM: Ajuste do torchState para mobile_scanner 5.x (Triunfo) [cite: 2025-10-27]
           Positioned(
             top: 20,
             right: 20,
             child: CircleAvatar(
               backgroundColor: Colors.black54,
-              child: IconButton(
-                color: Colors.white,
-                icon: ValueListenableBuilder(
-                  valueListenable: controller.torchState,
-                  builder: (context, state, child) {
-                    switch (state) {
-                      case TorchState.off:
-                        return const Icon(Icons.flash_off, color: Colors.grey);
-                      case TorchState.on:
-                        return const Icon(Icons.flash_on, color: Colors.yellow);
-                    }
-                  },
-                ),
-                onPressed: () => controller.toggleTorch(),
+              child: ValueListenableBuilder<MobileScannerState>(
+                valueListenable: controller,
+                builder: (context, state, child) {
+                  return IconButton(
+                    color: Colors.white,
+                    icon: _buildTorchIcon(state.torchState),
+                    onPressed: () => controller.toggleTorch(),
+                  );
+                },
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // Ponderação Ética: Garante que um Widget sempre seja retornado (Evita erro de Build)
+  Widget _buildTorchIcon(TorchState state) {
+    switch (state) {
+      case TorchState.off:
+        return const Icon(Icons.flash_off, color: Colors.grey);
+      case TorchState.on:
+        return const Icon(Icons.flash_on, color: Colors.yellow);
+      default:
+        return const Icon(Icons.flash_off, color: Colors.grey);
+    }
   }
 }
