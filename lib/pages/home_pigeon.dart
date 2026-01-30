@@ -19,6 +19,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
   
   Timer? _pollingTimer;
   String _currentDwellerId = "";
+  Map<String, bool> _onlineStatuses = {};
 
   @override
   void initState() {
@@ -54,12 +55,23 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (mounted) {
-        final newMessages = await _pigeonService.fetchMessages(userId: userId);
-        if (newMessages.isNotEmpty && mounted) {
-          setState(() {}); 
-        }
+        await _pigeonService.fetchMessages(userId: userId);
+        await _refreshOnlineStatuses();
+        if (mounted) setState(() {}); 
       }
     });
+  }
+
+  Future<void> _refreshOnlineStatuses() async {
+    if (_currentDwellerId.isEmpty) return;
+    final chats = await PigeonDatabase.instance.getRecentChats(_currentDwellerId);
+    for (var chat in chats) {
+      String peerId = chat['peer_id'] ?? "";
+      if (peerId.isNotEmpty) {
+        bool isOnline = await _pigeonService.checkPeerStatus(peerId);
+        _onlineStatuses[peerId] = isOnline;
+      }
+    }
   }
 
   Future<List<Map<String, dynamic>>> _getCombinedMessages(String userId) async {
@@ -70,6 +82,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
   Future<void> _handleRefresh() async {
     if (_currentDwellerId.isNotEmpty) {
       await _pigeonService.fetchMessages(userId: _currentDwellerId);
+      await _refreshOnlineStatuses();
     }
     if (mounted) setState(() {}); 
   }
@@ -92,15 +105,13 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
       appBar: AppBar(
         backgroundColor: EnXStyle.primaryBlue, 
         automaticallyImplyLeading: false, 
-        // TRIUNFO: Lado dos botões invertido para melhor fluxo de navegação [cite: 2025-10-27]
         title: Row(
           children: [
-            // Botão Perfil à esquerda
+            // AJUSTE: Redirecionamento correto para o Perfil do Usuário
             IconButton(
               icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
-              onPressed: () => Navigator.pushNamed(context, '/profile'),
+              onPressed: () => Navigator.pushNamed(context, '/profile_view'),
             ),
-            // Botão QR ao lado do perfil
             IconButton(
               icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF25D366), size: 24),
               onPressed: _openQrScanner,
@@ -167,7 +178,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
             final msg = messages[index];
             final String contactId = msg['peer_id'] ?? "Desconhecido";
             
-            bool isUserOnline = PigeonService.isSystemOnline; 
+            bool isPeerOnline = _onlineStatuses[contactId] ?? false; 
             int unreadCount = msg['unread_count'] ?? 0; 
 
             return ListTile(
@@ -178,7 +189,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
                     child: Text(contactId.isNotEmpty ? contactId[0] : "?", 
                       style: const TextStyle(color: Colors.white70)),
                   ),
-                  if (isUserOnline)
+                  if (isPeerOnline)
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -267,6 +278,7 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
           ),
         ),
         actions: [
+          // ... ações do dialog mantidas intactas ...
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("CANCELAR", style: TextStyle(color: Colors.white54)),

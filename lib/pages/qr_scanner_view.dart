@@ -9,17 +9,12 @@ class QrScannerView extends StatefulWidget {
 class _QrScannerViewState extends State<QrScannerView> {
   bool _isScanCompleted = false;
   
-  // TRIUNFO: Controlador configurado para gerenciar o hardware da câmera [cite: 2025-10-27]
-  final MobileScannerController controller = MobileScannerController();
-
-  @override
-  void initState() {
-    super.initState();
-    // REAVALIAÇÃO COGNITIVA: Força a inicialização da câmera após o build para evitar tela preta [cite: 2025-10-27]
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.start();
-    });
-  }
+  // TRIUNFO: Controlador com detecção automática e gerenciamento de hardware [cite: 2025-10-27]
+  final MobileScannerController controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.normal,
+    facing: CameraFacing.back,
+    torchEnabled: false,
+  );
 
   void _onDetect(BarcodeCapture capture) {
     if (!_isScanCompleted) {
@@ -27,9 +22,8 @@ class _QrScannerViewState extends State<QrScannerView> {
       for (final barcode in barcodes) {
         final String? code = barcode.rawValue;
         if (code != null) {
-          setState(() => _isScanCompleted = true);
-          
-          // Alívio: ID detectado com sucesso, retornando dado ao sistema [cite: 2025-10-27]
+          _isScanCompleted = true; // Regulação comportamental: evita pops duplos [cite: 2025-10-27]
+          // Alívio: ID detectado com sucesso [cite: 2025-10-27]
           Navigator.pop(context, code);
         }
       }
@@ -38,7 +32,7 @@ class _QrScannerViewState extends State<QrScannerView> {
 
   @override
   void dispose() {
-    // Memória-segmentada: Encerrando processo da câmera para poupar energia [cite: 2025-10-27]
+    // Memória-segmentada: Encerrando recursos de hardware [cite: 2025-10-27]
     controller.dispose();
     super.dispose();
   }
@@ -54,23 +48,15 @@ class _QrScannerViewState extends State<QrScannerView> {
       ),
       body: Stack(
         children: [
-          // REAVALIAÇÃO COGNITIVA: MobileScanner v5+ exige o controller para permissões automáticas [cite: 2025-10-27]
+          // REAVALIAÇÃO COGNITIVA: fit: BoxFit.cover resolve o problema de sobreposição/fundo preto [cite: 2025-10-27]
           MobileScanner(
             controller: controller,
             onDetect: _onDetect,
+            fit: BoxFit.cover, 
           ),
           
-          // Moldura visual (Paridade com EnX OS) [cite: 2025-10-27]
-          Center(
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFF25D366), width: 2), 
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
+          // Custom Overlay: Substituindo o Container por um CustomPaint para evitar bugs de layout
+          _buildScannerOverlay(context),
           
           Positioned(
             bottom: 80,
@@ -91,18 +77,22 @@ class _QrScannerViewState extends State<QrScannerView> {
             ),
           ),
 
-          // CALIBRAGEM: Ajuste do torchState para mobile_scanner 5.x (Triunfo) [cite: 2025-10-27]
           Positioned(
             top: 20,
             right: 20,
             child: CircleAvatar(
               backgroundColor: Colors.black54,
-              child: ValueListenableBuilder<MobileScannerState>(
+              child: ValueListenableBuilder(
                 valueListenable: controller,
                 builder: (context, state, child) {
+                  // Ponderação ética: Se o estado for nulo, o flash começa desligado [cite: 2025-10-27]
+                  final TorchState torchState = state.torchState;
                   return IconButton(
                     color: Colors.white,
-                    icon: _buildTorchIcon(state.torchState),
+                    icon: Icon(
+                      torchState == TorchState.on ? Icons.flash_on : Icons.flash_off,
+                      color: torchState == TorchState.on ? Colors.yellow : Colors.white,
+                    ),
                     onPressed: () => controller.toggleTorch(),
                   );
                 },
@@ -114,15 +104,96 @@ class _QrScannerViewState extends State<QrScannerView> {
     );
   }
 
-  // Ponderação Ética: Garante que um Widget sempre seja retornado (Evita erro de Build) [cite: 2025-10-27]
-  Widget _buildTorchIcon(TorchState state) {
-    switch (state) {
-      case TorchState.off:
-        return const Icon(Icons.flash_off, color: Colors.grey);
-      case TorchState.on:
-        return const Icon(Icons.flash_on, color: Colors.yellow);
-      default:
-        return const Icon(Icons.flash_off, color: Colors.grey);
-    }
+  // TRIUNFO: Moldura visual limpa sem afetar o buffer da câmera [cite: 2025-10-27]
+  Widget _buildScannerOverlay(BuildContext context) {
+    return Container(
+      decoration: ShapeDecoration(
+        shape: QrScannerOverlayShape(
+          borderColor: const Color(0xFF25D366),
+          borderRadius: 20,
+          borderLength: 30,
+          borderWidth: 10,
+          cutOutSize: 250,
+        ),
+      ),
+    );
   }
+}
+
+// Classe auxiliar para desenhar a moldura (Paridade com EnX OS) [cite: 2025-10-27]
+class QrScannerOverlayShape extends ShapeBorder {
+  final Color borderColor;
+  final double borderWidth;
+  final double borderRadius;
+  final double borderLength;
+  final double cutOutSize;
+
+  QrScannerOverlayShape({
+    this.borderColor = Colors.white,
+    this.borderWidth = 1.0,
+    this.borderRadius = 0,
+    this.borderLength = 40,
+    this.cutOutSize = 250,
+  });
+
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.zero;
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) => Path();
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) => Path()..addRect(rect);
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    final backgroundPaint = Paint()..color = Colors.black.withOpacity(0.5);
+    final cutOutRect = Rect.fromCenter(
+      center: rect.center,
+      width: cutOutSize,
+      height: cutOutSize,
+    );
+
+    // Desenha o fundo escurecido em volta do quadrado
+    canvas.drawPath(
+      Path.combine(
+        PathOperation.difference,
+        Path()..addRect(rect),
+        Path()..addRRect(RRect.fromRectAndRadius(cutOutRect, Radius.circular(borderRadius))),
+      ),
+      backgroundPaint,
+    );
+
+    final paint = Paint()
+      ..color = borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = borderWidth;
+
+    // Desenha as bordas (cantos)
+    final path = Path();
+    // Canto superior esquerdo
+    path.moveTo(cutOutRect.left, cutOutRect.top + borderLength);
+    path.lineTo(cutOutRect.left, cutOutRect.top);
+    path.lineTo(cutOutRect.left + borderLength, cutOutRect.top);
+    
+    // Canto superior direito
+    path.moveTo(cutOutRect.right - borderLength, cutOutRect.top);
+    path.lineTo(cutOutRect.right, cutOutRect.top);
+    path.lineTo(cutOutRect.right, cutOutRect.top + borderLength);
+
+    // Canto inferior direito
+    path.moveTo(cutOutRect.right, cutOutRect.bottom - borderLength);
+    path.lineTo(cutOutRect.right, cutOutRect.bottom);
+    path.lineTo(cutOutRect.right - borderLength, cutOutRect.bottom);
+
+    // Canto inferior esquerdo
+    path.moveTo(cutOutRect.left + borderLength, cutOutRect.bottom);
+    path.lineTo(cutOutRect.left, cutOutRect.bottom);
+    path.lineTo(cutOutRect.left, cutOutRect.bottom - borderLength);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  ShapeBorder scale(double t) => QrScannerOverlayShape();
 }

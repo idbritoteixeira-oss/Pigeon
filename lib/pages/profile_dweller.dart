@@ -1,12 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Necessário para pegar o meu ID
+import 'package:shared_preferences/shared_preferences.dart';
 import '../style.dart';
 import '../database/pigeon_database.dart';
+import '../services/pigeon_service.dart'; // Importado para checar status
 
-class ProfileDweller extends StatelessWidget {
+class ProfileDweller extends StatefulWidget {
+  @override
+  State<ProfileDweller> createState() => _ProfileDwellerState();
+}
+
+class _ProfileDwellerState extends State<ProfileDweller> {
+  final PigeonService _pigeonService = PigeonService();
+  bool _isOnline = false;
+  bool _checkingStatus = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkStatus();
+  }
+
+  // TRIUNFO: Verifica se o habitante está online ao abrir o perfil [cite: 2025-10-27]
+  Future<void> _checkStatus() async {
+    final String peerId = ModalRoute.of(context)?.settings.arguments as String? ?? "000";
+    bool online = await _pigeonService.checkPeerStatus(peerId);
+    if (mounted) {
+      setState(() {
+        _isOnline = online;
+        _checkingStatus = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // REAVALIAÇÃO COGNITIVA: Captura o ID passado pelo ChatView [cite: 2025-10-27]
     final String peerId = ModalRoute.of(context)?.settings.arguments as String? ?? "000";
 
     return Scaffold(
@@ -35,11 +62,19 @@ class ProfileDweller extends StatelessWidget {
                       style: const TextStyle(fontSize: 40, color: EnXStyle.primaryBlue, fontWeight: FontWeight.bold),
                     ),
                   ),
+                  // REGULAÇÃO COMPORTAMENTAL: Selo muda de cor conforme o status real [cite: 2025-10-27]
                   Container(
                     margin: const EdgeInsets.all(4),
                     padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: Color(0xFF25D366), shape: BoxShape.circle),
-                    child: const Icon(Icons.verified, color: Colors.black, size: 20),
+                    decoration: BoxDecoration(
+                      color: _isOnline ? const Color(0xFF25D366) : Colors.grey, 
+                      shape: BoxShape.circle
+                    ),
+                    child: Icon(
+                      _isOnline ? Icons.verified : Icons.cloud_off, 
+                      color: Colors.black, 
+                      size: 20
+                    ),
                   ),
                 ],
               ),
@@ -49,20 +84,27 @@ class ProfileDweller extends StatelessWidget {
               "Habitante $peerId",
               style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const Text(
-              "Protocolo Pigeon Ativo",
-              style: TextStyle(color: Color(0xFF25D366), fontSize: 14, letterSpacing: 1.2),
+            Text(
+              _checkingStatus ? "Verificando sinal..." : (_isOnline ? "Protocolo Pigeon Ativo" : "Protocolo em Hibernação"),
+              style: TextStyle(
+                color: _isOnline ? const Color(0xFF25D366) : Colors.white38, 
+                fontSize: 14, 
+                letterSpacing: 1.2
+              ),
             ),
 
             const SizedBox(height: 40),
 
             _buildInfoTile(Icons.fingerprint, "ID de Cidadão", peerId),
             _buildInfoTile(Icons.security, "Criptografia", "Ponto-a-Ponto (Janeway)"),
-            _buildInfoTile(Icons.location_on, "Localização", "Setor EnX OS"),
+            _buildInfoTile(
+              _isOnline ? Icons.location_on : Icons.location_off, 
+              "Status de Rede", 
+              _isOnline ? "Conectado ao Setor EnX" : "Sinal Perdido"
+            ),
 
             const SizedBox(height: 30),
 
-            // Botão de Ação: Limpar Conversa (Livre-arbítrio) [cite: 2025-10-27]
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: ElevatedButton.icon(
@@ -120,17 +162,14 @@ class ProfileDweller extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCELAR")),
           TextButton(
             onPressed: () async {
-              // TRIUNFO: Busca o dweller_id local para garantir a paridade na deleção [cite: 2025-10-27]
               final prefs = await SharedPreferences.getInstance();
               final String myId = prefs.getString('dweller_id') ?? "global";
-
-              // Executa a limpeza na Memória-consolidada
               await PigeonDatabase.instance.clearChat(myId, peerId); 
               
               if (context.mounted) {
-                Navigator.pop(context); // Fecha o Dialog
-                Navigator.pop(context); // Sai do Perfil
-                Navigator.pop(context); // Sai do Chat e volta para a Home atualizada
+                Navigator.pop(context); 
+                Navigator.pop(context); 
+                Navigator.pop(context); 
               }
             }, 
             child: const Text("APAGAR", style: TextStyle(color: Colors.redAccent))

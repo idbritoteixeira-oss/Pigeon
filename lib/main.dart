@@ -39,6 +39,7 @@ void main() async {
     // Se estiver autenticado e tiver um ID, vai direto para a Home
     initialRoute: (isAuthenticated && dwellerId.isNotEmpty) ? '/home_pigeon' : '/',
     
+    // REGULAÇÃO COMPORTAMENTAL: Rotas nomeadas para navegação limpa
     routes: {
       '/': (context) => SplashScreen(),
       '/login': (context) => Login(),
@@ -53,5 +54,10 @@ void main() async {
       '/profile_dweller': (context) => ProfileDweller(),  // Rota do perfil de quem você conversa
       '/qr_scanner': (context) => QrScannerView(),        // Rota do scanner de QR
     },
+
+    // Ponderação técnica: Fallback para evitar erros de tela preta
+    onUnknownRoute: (settings) => MaterialPageRoute(
+      builder: (context) => HomePigeon(),
+    ),
   ));
 }

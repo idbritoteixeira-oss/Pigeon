@@ -20,12 +20,13 @@ class _ChatViewState extends State<ChatView> {
   List<Map<String, dynamic>> _messages = []; 
   final PigeonService _pigeonService = PigeonService();
   
-  // REAVALIAÇÃO COGNITIVA: Timer de Polling para paridade com o Replit [cite: 2025-10-27]
   Timer? _chatPollingTimer;
   
   String? _myId;
   String _peerId = ""; 
   bool _isLoading = true;
+  // REAVALIAÇÃO COGNITIVA: Estado local para o status do parceiro [cite: 2025-10-27]
+  bool _isPeerOnline = false;
 
   @override
   void didChangeDependencies() {
@@ -42,8 +43,10 @@ class _ChatViewState extends State<ChatView> {
       
       await _loadLocalHistory();
       await _syncWithServer(); 
+      
+      // Busca status inicial do par
+      _checkPeerPresence();
 
-      // TRIUNFO: Busca novas mensagens a cada 5 segundos enquanto o chat estiver aberto [cite: 2025-10-27]
       _startChatPolling();
     } catch (e) {
       print("Erro ao inicializar chat: $e");
@@ -52,19 +55,30 @@ class _ChatViewState extends State<ChatView> {
     }
   }
 
+  // TRIUNFO: Verifica a presença do parceiro no servidor [cite: 2025-10-27]
+  Future<void> _checkPeerPresence() async {
+    if (_peerId.isEmpty) return;
+    bool online = await _pigeonService.checkPeerStatus(_peerId);
+    if (mounted) {
+      setState(() => _isPeerOnline = online);
+    }
+  }
+
   void _startChatPolling() {
     _chatPollingTimer?.cancel();
     _chatPollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       if (mounted && _myId != null) {
+        // Sincroniza mensagens
         int antes = _messages.length;
         await _syncWithServer();
+        
+        // REGULAÇÃO COMPORTAMENTAL: Aproveita o poll para checar se o amigo sumiu ou voltou [cite: 2025-10-27]
+        await _checkPeerPresence();
         
         if (_messages.length > antes) {
           if (await Vibration.hasVibrator() ?? false) Vibration.vibrate(duration: 50);
           try { await _audioPlayer.play(AssetSource('sounds/push.mp3')); } catch (_) {}
         }
-        // REGULAÇÃO COMPORTAMENTAL: Atualiza a bolinha de status se o poll mudar
-        if (mounted) setState(() {});
       }
     });
   }
@@ -140,10 +154,8 @@ class _ChatViewState extends State<ChatView> {
         elevation: 0,
         title: Row(
           children: [
-            // TRIUNFO: Ícone com bolinha de status e clique para perfil [cite: 2025-10-27]
             GestureDetector(
               onTap: () {
-                // Abre o perfil do Habitante ao clicar na foto
                 Navigator.pushNamed(context, '/profile_dweller', arguments: _peerId);
               },
               child: Stack(
@@ -153,7 +165,8 @@ class _ChatViewState extends State<ChatView> {
                     backgroundColor: Colors.white10, 
                     child: Icon(Icons.person, color: Colors.white70, size: 20)
                   ),
-                  if (PigeonService.isSystemOnline)
+                  // PARIDADE: A bolinha agora reflete se o AMIGO está online via Presence Map [cite: 2025-10-27]
+                  if (_isPeerOnline)
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -175,7 +188,11 @@ class _ChatViewState extends State<ChatView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text("Habitante $_peerId", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text("Seu ID: $_myId", style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                // ALÍVIO: Texto dinâmico de status [cite: 2025-10-27]
+                Text(
+                  _isPeerOnline ? "Online agora" : "Visto por último recentemente", 
+                  style: TextStyle(fontSize: 10, color: _isPeerOnline ? const Color(0xFF25D366) : Colors.white54)
+                ),
               ],
             ),
           ],
@@ -200,7 +217,6 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildMessageBubble(Map<String, dynamic> msg) {
-    // REAVALIAÇÃO COGNITIVA: Identificação precisa de quem enviou [cite: 2025-10-27]
     bool isMe = msg['sender_id'] == _myId || msg['is_me'] == 1;
     
     return Align(

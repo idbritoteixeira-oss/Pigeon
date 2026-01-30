@@ -1,20 +1,17 @@
 import 'dart:convert';
-import 'dart:async'; // Necessário para TimeoutException
+import 'dart:async'; 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pigeon_model.dart';
-// REAVALIAÇÃO COGNITIVA: Foco total no banco SQLite unificado [cite: 2025-10-27]
 import '../database/pigeon_database.dart'; 
 
 class PigeonService {
   final String baseUrl = "https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev"; 
 
-  // REAVALIAÇÃO COGNITIVA: Estado global de conexão baseado no Poll [cite: 2025-10-27]
   static bool isSystemOnline = false; 
 
   // --- MÓDULO DE IDENTIDADE & PERFIL ---
 
-  // Ajuda na paridade com a Home: Recupera o ID salvo
   Future<String?> getDwellerId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('dweller_id');
@@ -32,7 +29,6 @@ class PigeonService {
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    // Alívio: Remove os dados sensíveis para garantir o livre-arbítrio de saída [cite: 2025-10-27]
     await prefs.remove('dweller_id');
     await prefs.remove('pigeon_name');
     await prefs.remove('is_authenticated'); 
@@ -41,6 +37,25 @@ class PigeonService {
 
   String getOnlineStatus() {
     return isSystemOnline ? "Online agora" : "Desconectado";
+  }
+
+  // TRIUNFO: Nova verificação de presença do parceiro (Peer) [cite: 2025-10-27]
+  Future<bool> checkPeerStatus(String peerId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/check_peer_status'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"peer_id": peerId}),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['status'] == 'online';
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
   }
 
   // --- MÓDULO DE COMUNICAÇÃO ---
@@ -77,7 +92,6 @@ class PigeonService {
     }
   }
 
-  // TRIUNFO: Busca mensagens e consolida a Memória-segmentada no SQLite [cite: 2025-10-27]
   Future<List<PigeonMessage>> fetchMessages({required String userId}) async {
     if (userId.isEmpty) return [];
     try {
@@ -85,10 +99,9 @@ class PigeonService {
         Uri.parse('$baseUrl/fetch_messages'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"user_id": userId}), 
-      ).timeout(const Duration(seconds: 8)); // Timeout para evitar espera infinita
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        // REGULAÇÃO COMPORTAMENTAL: Poll bem-sucedido ativa o indicador visual [cite: 2025-10-27]
         isSystemOnline = true; 
 
         List<dynamic> body = jsonDecode(response.body);
@@ -111,7 +124,6 @@ class PigeonService {
         return [];
       }
     } on TimeoutException {
-      // Ponderação ética: Se o servidor não responder a tempo, estamos offline [cite: 2025-10-27]
       isSystemOnline = false;
       return [];
     } catch (e) {
