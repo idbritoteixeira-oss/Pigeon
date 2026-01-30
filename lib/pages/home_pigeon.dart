@@ -5,7 +5,6 @@ import '../style.dart';
 import '../services/pigeon_service.dart'; 
 import '../models/pigeon_model.dart';
 import '../database/pigeon_database.dart'; 
-import 'qr_scanner_view.dart'; 
 
 class HomePigeon extends StatefulWidget {
   @override
@@ -87,17 +86,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
     if (mounted) setState(() {}); 
   }
 
-  void _openQrScanner() async {
-    final String? scannedId = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => QrScannerView()),
-    );
-
-    if (scannedId != null && scannedId.isNotEmpty) {
-      Navigator.pushNamed(context, '/chat', arguments: scannedId).then((_) => setState(() {}));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,14 +95,9 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
         automaticallyImplyLeading: false, 
         title: Row(
           children: [
-            // AJUSTE: Redirecionamento correto para o Perfil do Usuário
             IconButton(
               icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
               onPressed: () => Navigator.pushNamed(context, '/profile_view'),
-            ),
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF25D366), size: 24),
-              onPressed: _openQrScanner,
             ),
             const SizedBox(width: 8),
             const Text("Pigeon", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
@@ -278,7 +261,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
           ),
         ),
         actions: [
-          // ... ações do dialog mantidas intactas ...
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("CANCELAR", style: TextStyle(color: Colors.white54)),

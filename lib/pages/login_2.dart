@@ -13,6 +13,21 @@ class _Login2State extends State<Login2> {
   final TextEditingController _passController = TextEditingController();
   bool _isLoading = false;
 
+  // REAVALIAÇÃO COGNITIVA: Antecipando o status da Home para evitar vácuo de informação [cite: 2025-10-27]
+  Future<void> _triggerImmediatePoll(String idPigeon) async {
+    try {
+      // Aqui você aponta para o seu endpoint de poll/status que a Home usa
+      final url = Uri.parse('https://8b48ce67-8062-40e3-be2d-c28fd3ae4f01-00-117turwazmdmc.janeway.replit.dev/poll_status');
+      await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"id_pub": idPigeon}),
+      ).timeout(const Duration(seconds: 2)); 
+    } catch (_) {
+      // Silencioso: Se falhar, o loop de 10s da Home assume depois.
+    }
+  }
+
   Future<void> _finalizarLogin(String idPigeon) async {
     if (_passController.text.isEmpty) return;
 
@@ -32,18 +47,17 @@ class _Login2State extends State<Login2> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // REAVALIAÇÃO COGNITIVA: Validando resposta do servidor C++ [cite: 2025-10-27]
         if (data['auth'] == 'success' || data['status'] == 'success') {
-
           final prefs = await SharedPreferences.getInstance();
 
-          // Memória consolidada: Garantindo a persistência do ID de 10 dígitos [cite: 2025-10-27]
           await prefs.setString('dweller_id', idPigeon); 
           await prefs.setBool('is_authenticated', true); 
 
+          // ALÍVIO: Refresh Poll executado antes de entrar para já chegar "Home ON" [cite: 2025-10-27]
+          await _triggerImmediatePoll(idPigeon);
+
           _mostrarMsg("Êxito: Acesso Concedido!", Colors.green);
 
-          // Sincronia: Navegação após gravação segura dos dados [cite: 2025-10-27]
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context, 
@@ -74,7 +88,6 @@ class _Login2State extends State<Login2> {
 
   @override
   Widget build(BuildContext context) {
-    // Paridade: Garantindo que o ID vindo da tela anterior seja usado [cite: 2025-10-27]
     final String idPigeon = ModalRoute.of(context)!.settings.arguments as String? ?? "0000000000";
 
     return Scaffold(
@@ -108,7 +121,6 @@ class _Login2State extends State<Login2> {
               style: const TextStyle(color: Colors.black, fontSize: 18),
               decoration: const InputDecoration(
                 hintText: "Senha Pigeon",
-                // CORREÇÃO: Usando Colors.black.withOpacity para evitar erro de 'member not found'
                 hintStyle: TextStyle(color: Colors.black38),
                 enabledBorder: UnderlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF075E54), width: 1.5)),

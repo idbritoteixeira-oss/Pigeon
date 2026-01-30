@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/pigeon_service.dart';
 import '../style.dart';
@@ -21,7 +20,6 @@ class _ProfileViewState extends State<ProfileView> {
     _loadProfileData();
   }
 
-  // REAVALIAÇÃO COGNITIVA: Busca dados reais para garantir paridade [cite: 2025-10-27]
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     final name = await _pigeonService.getGlobalName();
@@ -34,7 +32,6 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  // Ponderação Ética: Diálogo para edição do Nome Global [cite: 2025-10-27]
   void _showEditNameDialog(BuildContext context) {
     TextEditingController _nameController = TextEditingController(text: _globalName);
 
@@ -43,7 +40,7 @@ class _ProfileViewState extends State<ProfileView> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1A1B1E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Editar Nome Global", style: TextStyle(color: Colors.white)),
+        title: const Text("Editar Nome", style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: _nameController,
           autofocus: true,
@@ -79,9 +76,7 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // Regulação Comportamental: Logout e limpeza de memória [cite: 2025-10-27]
   void _handleLogout(BuildContext context) async {
-    // Alívio: Retorno seguro ao estado inicial limpando a sessão [cite: 2025-10-27]
     await _pigeonService.logout();
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
@@ -98,7 +93,7 @@ class _ProfileViewState extends State<ProfileView> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F1013),
       appBar: AppBar(
-        title: const Text("Meu Perfil Pigeon", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Perfil Pigeon", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -106,41 +101,20 @@ class _ProfileViewState extends State<ProfileView> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const SizedBox(height: 30),
+            const SizedBox(height: 50),
             
-            // TRIUNFO: QR CODE SECTION com Estética EnX [cite: 2025-10-27]
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF25D366).withOpacity(0.2),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    )
-                  ],
-                ),
-                child: QrImageView(
-                  data: _dwellerId,
-                  version: QrVersions.auto,
-                  size: 200.0,
-                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
-                  dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.circle, color: Colors.black),
-                ),
+            const Center(
+              child: Icon(
+                Icons.account_circle,
+                size: 120,
+                color: Colors.white10,
               ),
             ),
             
-            const SizedBox(height: 10),
-            const Text("Seu QR Code de Conexão", style: TextStyle(color: Colors.white38, fontSize: 12)),
+            const SizedBox(height: 40),
             
-            const SizedBox(height: 30),
-            
-            // INFO SECTION (Memória-consolidada)
             _buildProfileTile(
-              label: "Nome Global",
+              label: "Nome",
               value: _globalName,
               icon: Icons.person_outline,
               trailing: const Icon(Icons.edit, color: EnXStyle.primaryBlue, size: 20),
@@ -148,7 +122,7 @@ class _ProfileViewState extends State<ProfileView> {
             ),
             
             _buildProfileTile(
-              label: "Dweller ID (Telefone)",
+              label: "Meu ID Pigeon",
               value: _dwellerId,
               icon: Icons.fingerprint,
             ),
@@ -160,9 +134,8 @@ class _ProfileViewState extends State<ProfileView> {
               valueColor: const Color(0xFF25D366),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 60),
 
-            // LOGOUT (Livre-arbítrio)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: SizedBox(
