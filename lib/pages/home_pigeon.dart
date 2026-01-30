@@ -92,14 +92,21 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
       appBar: AppBar(
         backgroundColor: EnXStyle.primaryBlue, 
         automaticallyImplyLeading: false, 
+        // TRIUNFO: Lado dos botões invertido para melhor fluxo de navegação [cite: 2025-10-27]
         title: Row(
           children: [
-            const Text("Pigeon", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(width: 10),
+            // Botão Perfil à esquerda
             IconButton(
-              icon: const Icon(Icons.qr_code_scanner, color: Colors.white70, size: 20),
+              icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
+              onPressed: () => Navigator.pushNamed(context, '/profile'),
+            ),
+            // Botão QR ao lado do perfil
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF25D366), size: 24),
               onPressed: _openQrScanner,
             ),
+            const SizedBox(width: 8),
+            const Text("Pigeon", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ],
         ),
         elevation: 0,
@@ -160,9 +167,8 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
             final msg = messages[index];
             final String contactId = msg['peer_id'] ?? "Desconhecido";
             
-            // Lógica injetada para Status e Badges
-            bool isUserOnline = PigeonService.isSystemOnline; // Status baseado no poll real
-            int unreadCount = msg['unread_count'] ?? 0; // Quantidade de novas mensagens
+            bool isUserOnline = PigeonService.isSystemOnline; 
+            int unreadCount = msg['unread_count'] ?? 0; 
 
             return ListTile(
               leading: Stack(
@@ -197,7 +203,6 @@ class _HomePigeonState extends State<HomePigeon> with SingleTickerProviderStateM
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white38, fontSize: 13)
               ),
-              // TRIUNFO: Trailing atualizado com Badge de novas mensagens
               trailing: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,

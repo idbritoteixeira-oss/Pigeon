@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Necessário para pegar o meu ID
 import '../style.dart';
 import '../database/pigeon_database.dart';
 
@@ -22,7 +23,6 @@ class ProfileDweller extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Avatar Centralizado
             Center(
               child: Stack(
                 alignment: Alignment.bottomRight,
@@ -56,7 +56,6 @@ class ProfileDweller extends StatelessWidget {
 
             const SizedBox(height: 40),
 
-            // Seção de Informações (Ponderação Ética sobre Dados) [cite: 2025-10-27]
             _buildInfoTile(Icons.fingerprint, "ID de Cidadão", peerId),
             _buildInfoTile(Icons.security, "Criptografia", "Ponto-a-Ponto (Janeway)"),
             _buildInfoTile(Icons.location_on, "Localização", "Setor EnX OS"),
@@ -121,12 +120,18 @@ class ProfileDweller extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCELAR")),
           TextButton(
             onPressed: () async {
-              // TRIUNFO: Usa o método que criamos na DB para limpar [cite: 2025-10-27]
-              // Note: Você precisará passar o seu dweller_id aqui se quiser ser específico
-              // Por enquanto, deletamos do peer_id global na tabela
-              await PigeonDatabase.instance.clearChat("global", peerId); 
-              Navigator.pop(context);
-              Navigator.pop(context); // Volta para a Home
+              // TRIUNFO: Busca o dweller_id local para garantir a paridade na deleção [cite: 2025-10-27]
+              final prefs = await SharedPreferences.getInstance();
+              final String myId = prefs.getString('dweller_id') ?? "global";
+
+              // Executa a limpeza na Memória-consolidada
+              await PigeonDatabase.instance.clearChat(myId, peerId); 
+              
+              if (context.mounted) {
+                Navigator.pop(context); // Fecha o Dialog
+                Navigator.pop(context); // Sai do Perfil
+                Navigator.pop(context); // Sai do Chat e volta para a Home atualizada
+              }
             }, 
             child: const Text("APAGAR", style: TextStyle(color: Colors.redAccent))
           ),

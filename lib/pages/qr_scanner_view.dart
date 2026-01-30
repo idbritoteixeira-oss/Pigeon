@@ -12,6 +12,15 @@ class _QrScannerViewState extends State<QrScannerView> {
   // TRIUNFO: Controlador configurado para gerenciar o hardware da câmera [cite: 2025-10-27]
   final MobileScannerController controller = MobileScannerController();
 
+  @override
+  void initState() {
+    super.initState();
+    // REAVALIAÇÃO COGNITIVA: Força a inicialização da câmera após o build para evitar tela preta [cite: 2025-10-27]
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.start();
+    });
+  }
+
   void _onDetect(BarcodeCapture capture) {
     if (!_isScanCompleted) {
       final List<Barcode> barcodes = capture.barcodes;
@@ -29,7 +38,7 @@ class _QrScannerViewState extends State<QrScannerView> {
 
   @override
   void dispose() {
-    // Memória-segmentada: Encerrando processo da câmera para poupar energia
+    // Memória-segmentada: Encerrando processo da câmera para poupar energia [cite: 2025-10-27]
     controller.dispose();
     super.dispose();
   }
@@ -45,13 +54,13 @@ class _QrScannerViewState extends State<QrScannerView> {
       ),
       body: Stack(
         children: [
-          // REAVALIAÇÃO COGNITIVA: MobileScanner v5+ exige o controller para permissões automáticas
+          // REAVALIAÇÃO COGNITIVA: MobileScanner v5+ exige o controller para permissões automáticas [cite: 2025-10-27]
           MobileScanner(
             controller: controller,
             onDetect: _onDetect,
           ),
           
-          // Moldura visual (Paridade com EnX OS)
+          // Moldura visual (Paridade com EnX OS) [cite: 2025-10-27]
           Center(
             child: Container(
               width: 250,
@@ -105,7 +114,7 @@ class _QrScannerViewState extends State<QrScannerView> {
     );
   }
 
-  // Ponderação Ética: Garante que um Widget sempre seja retornado (Evita erro de Build)
+  // Ponderação Ética: Garante que um Widget sempre seja retornado (Evita erro de Build) [cite: 2025-10-27]
   Widget _buildTorchIcon(TorchState state) {
     switch (state) {
       case TorchState.off:
